@@ -153,7 +153,8 @@ const button_svg = document.getElementById("svg-tab")
 const button_raw = document.getElementById("raw-tab")
 const div_svg = document.getElementById("svg-div")
 const div_raw = document.getElementById("raw-div")
-if (!code_element || !output_element || !render_element || !button_svg || !button_raw || !div_svg || !div_raw) {
+const span_conversion_time = document.getElementById("conversion_time")
+if (!code_element || !output_element || !render_element || !button_svg || !button_raw || !div_svg || !div_raw || !span_conversion_time) {
     throw new Error("Missing element")
 }
 
@@ -172,6 +173,7 @@ const update_svg = () => {
         const svg_output = zplToSvg(zpl, { scale: 0.8, width, height })
         const render_time = +new Date() - t
         console.log("Render time:", render_time, "ms")
+        span_conversion_time.innerHTML = render_time + " ms"
         output_element.innerHTML = svg_output
         render_element.innerHTML = svg_output
     }, refresh_count == 1 ? 0 : 100)
