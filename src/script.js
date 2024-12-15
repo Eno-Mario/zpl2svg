@@ -157,9 +157,124 @@ const span_conversion_time = document.getElementById("conversion_time")
 const download_zpl = document.getElementById("download-zpl")
 const download_svg = document.getElementById("download-svg")
 const download_png = document.getElementById("download-png")
-if (!code_element || !output_element || !render_element || !button_svg || !button_raw || !div_svg || !div_raw || !span_conversion_time || !download_zpl || !download_svg || !download_png) {
+const zoom_value = document.getElementById('zoom_value')
+const x_value = document.getElementById('x_value')
+const y_value = document.getElementById('y_value')
+if (!code_element || !output_element || !render_element || !button_svg || !button_raw || !div_svg || !div_raw || !span_conversion_time || !download_zpl || !download_svg || !download_png || !zoom_value || !x_value || !y_value) {
     throw new Error("Missing element")
 }
+
+/** @type {{ svg_content: string, element: Element | null, viewBox: number[], viewBoxBase: number[], scale: number, x_offset: number, y_offset: number }} */
+const state = {
+    svg_content: '',
+    viewBox: [0, 0, 1000, 1000],
+    viewBoxBase: [0, 0, 1000, 1000],
+    element: null,
+    scale: 1,
+    x_offset: 100,
+    y_offset: 100,
+}
+
+// Get mouse position
+const mouse_pos = {
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+}
+
+
+// Add pan functionality
+let isDragging = false
+let start = { x: 0, y: 0 }
+
+const update_mouse_pos = (e) => {
+    const { left, top, width, height } = render_element.getBoundingClientRect()
+    // svg position - mouse position
+    if (e) {
+        mouse_pos.x = e.clientX - left
+        mouse_pos.y = e.clientY - top
+    }
+    mouse_pos.width = width
+    mouse_pos.height = height
+    const viewBoxDimensions = state.viewBox
+    const x = map(mouse_pos.x, 0, mouse_pos.width, viewBoxDimensions[0], viewBoxDimensions[0] + viewBoxDimensions[2])
+    const y = map(mouse_pos.y, 0, mouse_pos.height, viewBoxDimensions[1], viewBoxDimensions[1] + viewBoxDimensions[3])
+
+    if (isDragging) {
+        const dx = e.clientX - start.x
+        const dy = e.clientY - start.y
+        start = { x: e.clientX, y: e.clientY }
+        state.viewBox[0] -= dx / state.scale
+        state.viewBox[1] -= dy / state.scale
+        update_zoom_pan()
+    }
+
+    x_value.innerHTML = x.toFixed(0)
+    y_value.innerHTML = y.toFixed(0)
+
+}
+
+render_element.addEventListener("mousemove", update_mouse_pos)
+
+const map = (value, in_min, in_max, out_min, out_max) => (value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
+
+// @ts-ignore
+render_element.onmousewheel = function (e) {
+    e.preventDefault();
+    // Zoom in or out based on the cursor position on the current visible screen, limit zoom to 0.1 - 10
+    const delta = Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail)));
+    if (delta == 0) return;
+    const scale = Math.max(0.1, Math.min(10, state.scale + state.scale * delta * 0.1));
+    state.scale = scale
+
+    const viewBoxWidth = state.viewBoxBase[2] - state.viewBoxBase[0]
+    const viewBoxHeight = state.viewBoxBase[3] - state.viewBoxBase[1]
+
+    const x = map(mouse_pos.x, 0, mouse_pos.width, 0, 100)
+    const y = map(mouse_pos.y, 0, mouse_pos.height, 0, 100)
+
+    const newWidth = viewBoxWidth / scale
+    const newHeight = viewBoxHeight / scale
+
+    const diffWidth = newWidth - viewBoxWidth
+    const diffHeight = newHeight - viewBoxHeight
+
+    const newX = state.viewBoxBase[0] - diffWidth * x / 100
+    const newY = state.viewBoxBase[1] - diffHeight * y / 100
+
+    const limit = 100000
+
+    state.viewBox = [
+        Math.max(-limit, Math.min(limit, newX)),
+        Math.max(-limit, Math.min(limit, newY)),
+        newWidth,
+        newHeight
+    ]
+
+
+    update_zoom_pan()
+    zoom_value.innerHTML = state.scale.toFixed(1)
+    update_mouse_pos()
+}
+
+render_element.addEventListener("mousedown", (e) => {
+    // Only on middle mouse button or right mouse button
+    if (e.button != 1 && e.button != 2) return
+    e.preventDefault()
+    isDragging = true
+    start = { x: e.clientX, y: e.clientY }
+})
+
+render_element.addEventListener("mouseup", () => {
+    isDragging = false
+})
+
+const update_zoom_pan = () => {
+    if (state.element) state.element.setAttribute("viewBox", state.viewBox.join(" "))
+}
+
+update_zoom_pan()
 
 code_element.innerHTML = zpl_test_sample
 
@@ -173,19 +288,28 @@ const update_svg = () => {
         const t = +new Date()
         const { width, height } = render_element.getBoundingClientRect()
         // @ts-ignore
-        const svg_output = zplToSvg(zpl, { scale: 0.8, width, height })
+        state.svg_content = zplToSvg(zpl, { width, height, custom_class: "custom-svg-window" })
         const render_time = +new Date() - t
         console.log("Render time:", render_time, "ms")
         span_conversion_time.innerHTML = render_time + " ms"
-        output_element.innerHTML = svg_output
-        render_element.innerHTML = svg_output
+        output_element.innerHTML = state.svg_content
+        render_element.innerHTML = state.svg_content
         download_zpl.classList.remove("hidden")
         download_svg.classList.remove("hidden")
         download_png.classList.remove("hidden")
-    }, refresh_count == 1 ? 0 : 100)
+        const exists = state.element
+        state.element = document.querySelector(".custom-svg-window")
+        if (!exists && state.element) {
+            const viewBox = state.element.getAttribute("viewBox") || "0 0 1000 1000"
+            const [x, y, width, height] = viewBox.split(" ").map(parseFloat)
+            state.viewBoxBase = [x, y, width, height]
+            state.viewBox = [x, y, width, height]
+        }
+        update_zoom_pan()
+    }, refresh_count == 1 ? 0 : 50)
 }
 
-setTimeout(update_svg, 100)
+setTimeout(update_svg, 50)
 
 
 code_element.addEventListener("input", update_svg)
@@ -232,7 +356,7 @@ download_svg.addEventListener("click", (e) => {
     download_svg_active = true;
     setTimeout(() => download_svg_active = false, 1000);
     e?.preventDefault() // @ts-ignore
-    download_file("label.svg", render_element.innerHTML)
+    download_file("label.svg", state.svg_content)
 })
 
 
@@ -289,4 +413,4 @@ function export_png(filename, svg) {
     img.src = url;
 }
 
-download_png.addEventListener("click", () => export_png("label.png", render_element.innerHTML))
+download_png.addEventListener("click", () => export_png("label.png", state.svg_content))

@@ -45,7 +45,7 @@
         }
     }
 
-    /** @type { (zpl: string, options?: { width?: number, height?: number, scale?: number }) => string } */
+    /** @type { (zpl: string, options?: { width?: number, height?: number, scale?: number, x_offset?: number, y_offset?: number, custom_class?: string }) => string } */
     const zplToSvg = (zpl, options) => {
         options = options || {}
         const lines = zpl.split("\n").map(line => line.split('//')[0].trim()).filter(line => line.length > 0).join('').split('^').map(line => line.trim()).filter(line => line.length > 0)
@@ -53,6 +53,9 @@
         const scale = options.scale || 1
         const width = options.width || 1200
         const height = options.height || 800
+        const x_offset = options.x_offset || 0
+        const y_offset = options.y_offset || 0
+        const custom_class = options.custom_class || ''
         const state = {
             font: {
                 family: "Arial",
@@ -62,7 +65,7 @@
             },
             position: {
                 x: 0,
-                y: 0
+                y: 0,
             },
             stroke: "black",
             fill: "black",
@@ -83,8 +86,10 @@
         }
 
         // Add white background
-        svg.push(`<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" style="dominant-baseline: hanging;">`)
+        svg.push(`<svg ${custom_class ? `class="${custom_class}"` : ''} width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" style="dominant-baseline: hanging;">`)
         svg.push(`<rect x="0" y="0" width="100%" height="100%" fill="white"/>`)
+        svg.push(`<g transform="scale(${scale}) translate(${x_offset}, ${y_offset})">`)
+     
 
         // Track inversion regions
         let inversionMasks = []
@@ -109,8 +114,8 @@
 
                 case 'F0':
                 case 'FO': // Field Origin
-                    state.position.x = parseInt(args[0]) * scale;
-                    state.position.y = parseInt(args[1]) * scale;
+                    state.position.x = parseInt(args[0]);
+                    state.position.y = parseInt(args[1]);
                     break
 
                 case 'GB': { // Graphic Box
@@ -121,17 +126,17 @@
                     const params = encodeURI(JSON.stringify({
                         x: state.position.x,
                         y: state.position.y,
-                        w: width * scale,
-                        h: height * scale,
-                        i: inset * scale,
+                        w: width,
+                        h: height,
+                        i: inset,
                         f: state.fill,
                         s: state.stroke,
                     }))
                     const full = width / 2 <= inset || height / 2 <= inset
 
-                    const w = width * scale
-                    const h = height * scale
-                    const i = inset * scale
+                    const w = width
+                    const h = height
+                    const i = inset
 
                     // Outline
                     const x = state.position.x
@@ -188,14 +193,13 @@
                             break
                         }
 
-                        const SCALE = scale * scale_multiplier
 
                         // bwip-js is imported in index.html
                         // bwip-js.d.ts exists in the same folder as this file
                         const barcode_options = {
                             bcid,
                             text: value,
-                            height: state.barcode.height * SCALE / (6 * SCALE) / scale_multiplier,
+                            height: state.barcode.height * scale_multiplier / (6 * scale_multiplier) / scale_multiplier,
                             paddingtop: 0,
                             paddingbottom: 0,
                             paddingleft: 0,
@@ -203,7 +207,7 @@
                             includetext: state.barcode.print_human_readable,
                             textxalign: 'center',
                             textcolor: '#000',
-                            scale: 2 * SCALE,
+                            scale: 2 * scale_multiplier,
                             rotate: state.barcode.orientation === 'B' ? 'L' : state.barcode.orientation,
                         }
                         if (alttext && state.barcode.print_human_readable) barcode_options.alttext = alttext
@@ -256,10 +260,10 @@
                         }
                         state.barcode.type = ''
                     } else {
-                        const text = `<text x="${state.position.x}" y="${state.position.y}" font-size="${state.font.size * scale}" font-family="${state.font.family}" font-style="${state.font.style}" font-weight="${state.font.weight}">${value}</text>`
+                        const text = `<text x="${state.position.x}" y="${state.position.y}" font-size="${state.font.size}" font-family="${state.font.family}" font-style="${state.font.style}" font-weight="${state.font.weight}">${value}</text>`
                         if (state.inverted) {
                             // Add text to mask for inversion
-                            inversionMasks.push(`<text x="${state.position.x}" y="${state.position.y}" font-size="${state.font.size * scale}" font-family="${state.font.family}" font-style="${state.font.style}" font-weight="${state.font.weight}" fill="white">${value}</text>`)
+                            inversionMasks.push(`<text x="${state.position.x}" y="${state.position.y}" font-size="${state.font.size}" font-family="${state.font.family}" font-style="${state.font.style}" font-weight="${state.font.weight}" fill="white">${value}</text>`)
                         } else {
                             svg.push(text)
                         }
@@ -549,7 +553,7 @@
             svg.push(...svg.splice(2, svg.length - 2)) // Wrap all non-background content
             svg.push(`</g>`)
         }
-
+        svg.push(`</g>`)
         svg.push(`</svg>`)
         return svg.join('\n')
     }
