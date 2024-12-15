@@ -146,7 +146,7 @@
                     break
 
                 case 'FD': {
-                    const value = args.join(',')
+                    let value = args.join(',')
                     if (state.barcode.type) {
                         let bcid = ''
                         let scale_multiplier = state.barcode.barscale
@@ -154,7 +154,7 @@
                         switch (state.barcode.type) {
                             // case 'BC': bcid = 'code128'; break // Can't get this to work
                             case 'BC': bcid = 'hibccode128'; scale_multiplier *= 1; alttext = value; break // I don't know why but this works
-                            case 'B3': bcid = 'code39'; break
+                            case 'B3': bcid = 'code39'; value = value.toLocaleUpperCase(); break
                             default: break
                         }
                         if (!bcid) {
