@@ -12,16 +12,21 @@ body {
 }
 
 div.output {
-    display: flex;
-    flex-direction: row;
+    display: grid;
+    grid-template-columns: 1fr 2fr;
     width: 100%;
     height: 80vh;
 }
 
 div.output>div {
-    width: 50%;
+    padding: 5px;
+    margin: 0px;
     height: 100%;
-    padding: 10px;
+}
+.content {
+    padding: 5px;
+    margin: 0px;
+    height: 100%;
 }
 
 div.output h2 {
@@ -60,12 +65,9 @@ div.output button.active:hover {
     background-color: #061;
 }
 
-.content {
-    height: 100%;
-}
 
 div.output pre {
-    height: 90%;
+    height: 100%;
     background-color: #555;
     padding: 3px;
 }
@@ -80,7 +82,7 @@ div.output pre textarea {
     overflow: auto;
     font-size: 14px;
     font-family: 'Courier New', Courier, monospace;
-    padding: 10px;
+    padding: 5px;
     border-radius: 5px;
     line-height: 1.5;
     white-space: pre-wrap;
