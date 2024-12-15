@@ -17,9 +17,12 @@ There are still a lot of bugs and missing features, but it is a start.
 <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/bwip-js/4.5.1/bwip-js-min.js"></script>
 <script src="path_to/zpl2svg.js"></script>
 ```
-#### Node.JS import not yet finished. It's missing bwip-js import and the main function export. This is on my TODO list.
+#### Node.JS import:
+```js
+const zplToSvg = require('path_to/zpl2svg.js')
+```
 
-#### General usage:
+#### Example:
 ```js
 const zpl_content = `
   ^XA
