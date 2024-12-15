@@ -4,14 +4,14 @@
 "use strict";
 (function (root, factory) {
     if (typeof define === 'function' && define.amd) {
-        define([], factory);
+        define([bwipjs], factory);
     } else if (typeof module === 'object' && module.exports) {
-        module.exports = factory();
+        const bwipjs = require('bwip-js')
+        module.exports = factory(bwipjs);
     } else {
-        root.zplToSvg = factory();
+        root.zplToSvg = factory(bwipjs);
     }
-}(typeof self !== 'undefined' ? self : this, function () {
-
+}(typeof self !== 'undefined' ? self : this, function (bwipjs) {
 
     /** @type { (input: string[], configuration: { family: string, size: number, style: string, weight: string }) => void } */
     const parseFont = (input, configuration) => {
