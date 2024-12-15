@@ -104,12 +104,6 @@
                 -moz-box-sizing: border-box;
                 box-sizing: border-box;
             }
-
-            div.output svg {
-                /* width: 100%; */
-                /* height: auto; */
-            }
-
         </style>
     </head>
 
@@ -310,6 +304,7 @@
                 const zpl = code_element.value
                 const t = +new Date()
                 const { width, height } = render_element.getBoundingClientRect()
+                // @ts-ignore
                 const svg_output = zplToSvg(zpl, { scale: 0.6, width, height })
                 const render_time = +new Date() - t
                 console.log("Render time:", render_time, "ms")
