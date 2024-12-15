@@ -3,37 +3,66 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    font-family: 'Helvetica Neue', sans-serif;
 }
 
 body {
     background-color: #333;
     color: #fff;
     margin: 10px;
+    font-family: 'Helvetica Neue', sans-serif;
 }
 
-svg {
-    dominant-baseline: hanging;
-}
-
-/* .output class has 3 div columns inside  */
 div.output {
     display: flex;
-    justify-content: space-between;
-    margin: 10px;
-    min-height: 70vh;
+    flex-direction: row;
+    width: 100%;
+    height: 80vh;
 }
 
-/* .output div columns */
-div.output div {
-    width: 30%;
+div.output > div {
+    width: 50%;
+    height: 100%;
     padding: 10px;
-    background-color: #444;
+}
+
+div.output h2 {
+    font-size: 16px;
+    margin-bottom: 10px;
+}
+
+.hidden {
+    display: none;
+}
+
+
+div.output button {
+    background-color: #CCC;
+    color: #333;
+    border: none;
+    padding: 5px;
+    width: 150px;
+    cursor: pointer;
+    font-size: 18px;
+    font-weight: bold;
     border-radius: 5px;
+    margin-bottom: 5px;
+}
+
+div.output button.active {
+    background-color: #091;
+    color: #fff;
+}
+
+div.output button:hover { background-color: #666; }
+div.output button.active:hover { background-color: #061; }
+.content { 
+    height: 100%;
 }
 
 div.output pre {
     height: 90%;
+    background-color: #555;
+    padding: 3px;
 }
 
 div.output pre textarea {
@@ -64,6 +93,6 @@ div.output pre textarea {
 }
 
 div.output svg {
-    width: 100%;
-    height: auto;
+    /* width: 100%; */
+    /* height: auto; */
 }
