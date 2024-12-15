@@ -169,7 +169,7 @@ const update_svg = () => {
         const t = +new Date()
         const { width, height } = render_element.getBoundingClientRect()
         // @ts-ignore
-        const svg_output = zplToSvg(zpl, { scale: 0.6, width, height })
+        const svg_output = zplToSvg(zpl, { scale: 0.8, width, height })
         const render_time = +new Date() - t
         console.log("Render time:", render_time, "ms")
         output_element.innerHTML = svg_output
