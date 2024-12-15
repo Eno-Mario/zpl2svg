@@ -154,7 +154,10 @@ const button_raw = document.getElementById("raw-tab")
 const div_svg = document.getElementById("svg-div")
 const div_raw = document.getElementById("raw-div")
 const span_conversion_time = document.getElementById("conversion_time")
-if (!code_element || !output_element || !render_element || !button_svg || !button_raw || !div_svg || !div_raw || !span_conversion_time) {
+const download_zpl = document.getElementById("download-zpl")
+const download_svg = document.getElementById("download-svg")
+const download_png = document.getElementById("download-png")
+if (!code_element || !output_element || !render_element || !button_svg || !button_raw || !div_svg || !div_raw || !span_conversion_time || !download_zpl || !download_svg || !download_png) {
     throw new Error("Missing element")
 }
 
@@ -176,6 +179,9 @@ const update_svg = () => {
         span_conversion_time.innerHTML = render_time + " ms"
         output_element.innerHTML = svg_output
         render_element.innerHTML = svg_output
+        download_zpl.classList.remove("hidden")
+        download_svg.classList.remove("hidden")
+        download_png.classList.remove("hidden")
     }, refresh_count == 1 ? 0 : 100)
 }
 
@@ -199,3 +205,88 @@ button_raw.addEventListener("click", (e) => {
     button_svg.classList.remove("active")
     button_raw.classList.add("active")
 })
+
+/** @type { (filename: string, content: string) => void } */
+const download_file = (filename, content) => {
+    const blob = new Blob([content], { type: "text/plain" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+}
+
+let download_zpl_active = false
+download_zpl.addEventListener("click", (e) => {
+    if (download_zpl_active) return;
+    download_zpl_active = true;
+    setTimeout(() => download_zpl_active = false, 1000);
+    e?.preventDefault() // @ts-ignore
+    download_file("label.zpl", code_element.value)
+})
+
+let download_svg_active = false
+download_svg.addEventListener("click", (e) => {
+    if (download_svg_active) return;
+    download_svg_active = true;
+    setTimeout(() => download_svg_active = false, 1000);
+    e?.preventDefault() // @ts-ignore
+    download_file("label.svg", render_element.innerHTML)
+})
+
+
+let export_png_active = false
+function export_png(filename, svg) {
+    if (export_png_active) return;
+    export_png_active = true;
+    setTimeout(() => export_png_active = false, 5000);
+    // Create a Blob from the SVG string
+    const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+    const temp_canvas = document.createElement('canvas');
+    const img = new Image();
+    img.onload = function () {
+        // Ensure canvas matches the SVG dimensions
+        temp_canvas.width = img.width;
+        temp_canvas.height = img.height;
+
+        // Draw the image onto the canvas
+        const ctx = temp_canvas.getContext('2d');
+        if (!ctx) {
+            export_png_active = false;
+            console.error("Failed to get 2D context for canvas.");
+            URL.revokeObjectURL(url);
+            return;
+        }
+        ctx.clearRect(0, 0, temp_canvas.width, temp_canvas.height);
+        ctx.drawImage(img, 0, 0);
+
+        // Convert canvas to PNG data URL
+        const pngDataUrl = temp_canvas.toDataURL('image/png');
+
+        // Properly trigger a file download
+        const a = document.createElement('a');
+        a.href = pngDataUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        export_png_active = false;
+
+        // Revoke the object URL
+        URL.revokeObjectURL(url);
+    };
+
+    img.onerror = function () {
+        export_png_active = false;
+        console.error("Failed to load SVG for conversion.");
+        URL.revokeObjectURL(url);
+    };
+
+    // Start loading the image
+    img.src = url;
+}
+
+download_png.addEventListener("click", () => export_png("label.png", render_element.innerHTML))

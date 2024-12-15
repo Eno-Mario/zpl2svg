@@ -12,10 +12,10 @@
     <body>
         <div>
             <h1>Realtime ZPL to SVG Converter (work in progress)</h1>
-            <p>Convert Zebra Programming Language (ZPL) to Scalable Vector Graphics (SVG).</p>
+            <p>Github: <a href="https://github.com/Jozo132/zpl2svg">https://github.com/Jozo132/zpl2svg</a> - Author: Jozo132</p>
+            <h3 style="margin-top: 3px">Zebra Programming Language (ZPL) to Scalable Vector Graphics (SVG) converter written in vanilla JS.</h3>
+            <h3>The only dependency for this project is <a href="https://github.com/metafloor/bwip-js">bwip-js</a> for barcode rendering.</h3>
             <p>ZPL example code represents the VDA 4902 standard label format for testing.</p>
-            <p>Author: Jozo132</p>
-            <p>Github repo: <a href="https://github.com/Jozo132/zpl2svg" style="color: #0C3">https://github.com/Jozo132/zpl2svg</a></p>
         </div>
         <div class="output">
             <div>
@@ -26,7 +26,10 @@
                 <div class="header">
                     <button id="svg-tab" class="active">SVG</button>
                     <button id="raw-tab">RAW</button>
-                    <span style="margin-left: 10px;">Render time:<span id="conversion_time" style="margin-left: 10px;">/</span></span>
+                    <span style="margin-left: 10px; margin-right:25px">Render time:<span id="conversion_time" style="margin-left: 10px;">/</span></span>
+                    <button id="download-zpl" class="hidden">Download ZPL</button>
+                    <button id="download-svg" class="hidden">Download SVG</button>
+                    <button id="download-png" class="hidden">Download PNG</button>
                 </div>
                 <div id="svg-div" class="content">
                     <div id="svg" style="width: 100%; height: 90%"></div>
@@ -37,4 +40,5 @@
             </div>
         </div>
     </body>
+
 </html>
