@@ -12,7 +12,10 @@
         root.zplToSvg = factory(bwipjs);
     }
 }(typeof self !== 'undefined' ? self : this, function (bwipjs) {
-
+    if (!bwipjs) {
+        console.error('zpl2svg error: bwip-js is required for barcode generation')
+        return
+    }
     /** @type { (input: string[], configuration: { family: string, size: number, style: string, weight: string }) => void } */
     const parseFont = (input, configuration) => {
         const [font, height, width] = input
@@ -96,26 +99,39 @@
             const args = line.split(',')
 
             switch (command) {
-                case 'XA': break
+                case 'XA': break // Start of label
 
-                case 'FX': svg.push(`<!-- ${args.join(',')} -->`); break
+                case 'FX': svg.push(`<!-- ${args.join(',')} -->`); break // Comment
 
-                case 'FS': break
+                case 'FS': break // End of field
 
                 case 'CF': parseFont(args, state.font); break
 
-                case 'FO':
+                case 'F0':
+                case 'FO': // Field Origin
                     state.position.x = parseInt(args[0]) * scale;
                     state.position.y = parseInt(args[1]) * scale;
                     break
 
-                case 'GB': {
-                    const width = parseInt(args[0]) * scale
-                    const height = parseInt(args[1]) * scale
-                    const inset = parseInt(args[2]) * scale
+                case 'GB': { // Graphic Box
+                    const width = parseInt(args[0])
+                    const height = parseInt(args[1])
+                    const inset = parseInt(args[2])
                     // Draw shape with inset except when inset > width/2 or height/2 then just draw a rectangle with fill
-
+                    const params = encodeURI(JSON.stringify({
+                        x: state.position.x,
+                        y: state.position.y,
+                        w: width * scale,
+                        h: height * scale,
+                        i: inset * scale,
+                        f: state.fill,
+                        s: state.stroke,
+                    }))
                     const full = width / 2 <= inset || height / 2 <= inset
+
+                    const w = width * scale
+                    const h = height * scale
+                    const i = inset * scale
 
                     // Outline
                     const x = state.position.x
@@ -125,14 +141,14 @@
 
                     let rect
                     if (full) {
-                        rect = `<rect x="${x}" y="${y}" width="${width}" height="${height}" fill="${fill}"/>`
+                        rect = `<rect type="rect" x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}"/>`
                     } else {
                         // Draw 4 rectangles (top, right, bottom, left)
-                        const top = `<rect x="${x}" y="${y}" width="${width}" height="${inset}" fill="${fill}"/>`
-                        const right = `<rect x="${x + width - inset}" y="${y}" width="${inset}" height="${height}"/>`
-                        const bottom = `<rect x="${x}" y="${y + height - inset}" width="${width}" height="${inset}"/>`
-                        const left = `<rect x="${x}" y="${y}" width="${inset}" height="${height}"/>`
-                        rect = [top, right, bottom, left].join('\n')
+                        const top = `  <rect x="${x}" y="${y}" width="${w}" height="${i}" fill="${fill}"/>`
+                        const right = `  <rect x="${x + w - i}" y="${y}" width="${i}" height="${h}"/>`
+                        const bottom = `  <rect x="${x}" y="${y + h - i}" width="${w}" height="${i}"/>`
+                        const left = `  <rect x="${x}" y="${y}" width="${i}" height="${h}"/>`
+                        rect = [`<g type="rect" params="${params}">`, top, right, bottom, left, '</g>'].join('\n')
                     }
 
 
@@ -141,20 +157,30 @@
                     break
                 }
 
-                case 'FR':
+                case 'FR': // Field Reverse Print (DOESN'T WORK IN SVG YET) TODO: Implementaion of reverse print
                     state.inverted = true;
                     break
 
-                case 'FD': {
+                case 'FD': { // Field Data (Text or Barcode)
                     let value = args.join(',')
                     if (state.barcode.type) {
                         let bcid = ''
                         let scale_multiplier = state.barcode.barscale
                         let alttext = ''
                         switch (state.barcode.type) {
-                            // case 'BC': bcid = 'code128'; break // Can't get this to work
+                            case 'B0': bcid = 'azteccode'; break // TODO: Finish azteccode, partial implementation
+                            case 'B1': bcid = 'code11'; break // Works
+                            case 'B2': bcid = 'interleaved2of5'; break // Works
+                            case 'B3': bcid = 'code39'; value = value.toLocaleUpperCase(); break // Works
+                            case 'B4': bcid = 'code49'; break // Works
+                            case 'B5': bcid = 'planet'; break // Works
+                            case 'B7': bcid = 'pdf417'; break // Works
+                            case 'B8': bcid = 'ean8'; break // Works
+                            case 'B9': bcid = 'upce'; break // Works
+                            case 'BA': bcid = 'code93'; break // Works
+                            case 'BB': bcid = 'codablockf'; break // Works
+                            // case 'BC': bcid = 'code128'; break // Not exactly the same
                             case 'BC': bcid = 'hibccode128'; scale_multiplier *= 1; alttext = value; break // I don't know why but this works
-                            case 'B3': bcid = 'code39'; value = value.toLocaleUpperCase(); break
                             default: break
                         }
                         if (!bcid) {
@@ -172,12 +198,31 @@
                             height: state.barcode.height * SCALE / (6 * SCALE) / scale_multiplier,
                             paddingtop: 0,
                             paddingbottom: 0,
+                            paddingleft: 0,
+                            paddingright: 0,
                             includetext: state.barcode.print_human_readable,
                             textxalign: 'center',
                             textcolor: '#000',
                             scale: 2 * SCALE,
+                            rotate: state.barcode.orientation === 'B' ? 'L' : state.barcode.orientation,
                         }
                         if (alttext && state.barcode.print_human_readable) barcode_options.alttext = alttext
+                        if (bcid === 'azteccode') {
+                            delete barcode_options.height
+                            barcode_options.scale *= state.barcode.magnification / 4
+                            barcode_options.format = 'full'
+                            if (state.barcode.error_control >= 1 && state.barcode.error_control <= 99) {
+                                barcode_options.eclevel = state.barcode.error_control
+                            }
+                            if (state.barcode.error_control >= 101 && state.barcode.error_control <= 199) barcode_options.format = 'compact'
+                            if (state.barcode.error_control >= 201 && state.barcode.error_control <= 232) barcode_options.format = 'fullrange'
+                            if (state.barcode.error_control === 300) barcode_options.format = 'rune'
+
+                            if (state.barcode.extended_channel) barcode_options.parse = true
+                            if (state.barcode.menu_symbol) barcode_options.menu = true
+                            if (state.barcode.number_of_symbols > 1) barcode_options.ecaddchars = state.barcode.number_of_symbols
+                            if (state.barcode.optional_id) barcode_options.id = state.barcode.optional_id
+                        }
 
                         // @ts-ignore
                         const barcode = bwipjs.toSVG(barcode_options)
@@ -189,9 +234,25 @@
                             const [, width, height] = viewBox
                             // const barcode_svg = barcode.replace(/<svg/, `<svg x="${state.position.x}" y="${state.position.y}" width="${width}"`)
                             // replace svg with viewbox
-                            const params = encodeURI(JSON.stringify(state.barcode))
-                            const barcode_svg = barcode.replace(/<svg viewBox="0 0 (\d+) (\d+)"/, `<svg type="${bcid}" text="${value}" x="${state.position.x}" y="${state.position.y}" width="${width}" params="${params}" style="margin: 0; padding: 0 `)
-                            svg.push(barcode_svg)
+                            const params = encodeURI(JSON.stringify(Object.assign(
+                                {
+                                    x: state.position.x,
+                                    y: state.position.y,
+                                },
+                                state.barcode
+                            )))
+                            const barcode_svg = barcode.replace(/<svg viewBox="0 0 (\d+) (\d+)"/, `<svg x="${state.position.x}" y="${state.position.y}" width="${width}" style="margin: 0; padding: 0 `)
+
+                            svg.push([
+                                `<g type="barcode" params="${params}">`,
+                                barcode_svg.split('\n').map(line => {
+                                    line = line.trim()
+                                    if (!line) return ''
+                                    return '  ' + line
+                                }).filter(Boolean).join('\n'),
+                                '</g>'
+
+                            ].join('\n'))
                         }
                         state.barcode.type = ''
                     } else {
@@ -207,8 +268,8 @@
                     break
                 }
 
-                // Barcode settings
-                case 'BY': {
+
+                case 'BY': { // Barcode Field Default Parameters
                     state.barcode.width = parseInt(args[0]) || state.barcode.width
                     // state.barcode.ratio = parseInt(args[1]) || state.barcode.ratio
                     state.barcode.barscale = parseInt(args[1]) || state.barcode.barscale
@@ -216,8 +277,78 @@
                     break
                 }
 
+
+
+                // Aztec Code
+                case 'B0':
+                case 'BO': { // Format: ^B0a,b,c,d,e,f,g        Example: '^B0R,7,N,0,N,1,0^FDYourTextHere^FS'
+                    /*
+                        - a: orientation (N, R, I, B)
+                        - b: magnification factor (1-10) default:  1 on 150 DPI, 2 on 200 DPI, 3 on 300 DPI and 6 on 600 DPI
+                        - c: extended channel interpretation (N, Y) default: N
+                        - d: error control and symbol size/type identification default: 0
+                                - 0: default
+                                - 01 to 99: error control percentage (minimum)
+                                - 101 to 199: 1 to 4 layer compact symbol
+                                - 201 to 232: 1 to 32 layer full-range symbol
+                                - 300: a simple Aztec Rune symbol
+                        - e: menu symbol (N, Y) default: N
+                        - f: number of symbols (0-26) default: 1
+                        - g: optional ID field (24 characters max) default: <empty>  
+                    */
+                    state.barcode.type = command
+                    state.barcode.orientation = args[0] || state.barcode.orientation
+                    state.barcode.magnification = parseInt(args[1]) || 1
+                    state.barcode.extended_channel = args[2] ? args[2] === 'Y' : false
+                    state.barcode.error_control = parseInt(args[3]) || 0
+                    state.barcode.menu_symbol = args[4] ? args[4] === 'Y' : false
+                    state.barcode.number_of_symbols = parseInt(args[5]) || 1
+                    state.barcode.optional_id = args[6] || ''
+                    break
+                }
+
+                // Code 11 Barcode
+                case 'B1': { // Format: ^B1o,e,h,f,g     Example: '^B1N,N,150,Y,N^FD1234567890^FS'
+                    state.barcode.type = command
+                    /*
+                        Parameters:
+                            - orientation: N, R, I, B
+                            - check digit: N, Y
+                            - height: 10
+                            - print human readable: Y, N
+                            - print above: Y, N
+                    */
+                    state.barcode.orientation = args[0] || state.barcode.orientation
+                    state.barcode.check = args[1] ? args[1] === 'Y' : false
+                    state.barcode.height = parseInt(args[2]) || state.barcode.default_height
+                    state.barcode.print_human_readable = args[3] ? args[3] === 'Y' : true
+                    state.barcode.print_above = args[4] ? args[4] === 'Y' : false
+                    break
+                }
+
+                // Interleaved 2 of 5 Barcode
+                case 'B2': { // Format:  ^B2o,h,f,g,e,j    Example: '^B2N,100,Y,N,Y^FD1234567890^FS'
+                    state.barcode.type = command
+                    /*
+                        Parameters:
+                            - orientation: N, R, I, B
+                            - height: 10
+                            - print human readable: Y, N
+                            - print above: Y, N
+                            - check digit: Y, N
+                            - narrow bar width: 2, 3, 4, 5, 6, 7, 8, 9
+                    */
+                    state.barcode.orientation = args[0] || state.barcode.orientation
+                    state.barcode.height = parseInt(args[1]) || state.barcode.default_height
+                    state.barcode.print_human_readable = args[2] ? args[2] === 'Y' : true
+                    state.barcode.print_above = args[3] ? args[3] === 'Y' : false
+                    state.barcode.check = args[4] ? args[4] === 'Y' : false
+                    state.barcode.barscale = parseInt(args[5]) || state.barcode.barscale
+                    break
+                }
+
                 // Barcode 39
-                case 'B3': { // Example: '^B3N,N,80,N,N^FD2581752^FS'
+                case 'B3': { // Format: ^B3o,e,h,f,g,j,m,n    Example: '^B3N,N,80,N,N^FD2581752^FS'
                     state.barcode.type = command
                     /*
                       Parameters: 
@@ -235,8 +366,139 @@
                     break
                 }
 
+                // Barcode 49
+                case 'B4': { // Format: ^B4o,h,f,m      Example: '^B4N,100,Y,0^FD1234567890^FS'
+                    state.barcode.type = command
+                    /*
+                      Parameters: 
+                        - orientation: N, R, I, B
+                        - height: 10
+                        - print human readable: Y, N
+                        - mode: 0, 1, 2, 3, 4, 5, A    default: A
+                    */
+                    state.barcode.orientation = args[0] || state.barcode.orientation
+                    state.barcode.height = parseInt(args[1]) || state.barcode.default_height
+                    state.barcode.print_human_readable = args[2] ? args[2] === 'Y' : true
+                    state.barcode.mode = parseInt(args[3]) || 0
+                    break
+                }
+
+                // Planet Code Barcode
+                case 'B5': { // Format: ^B5o,h,f,g    Example: '^B5N,100,Y,N^FD1234567890^FS'
+                    state.barcode.type = command
+                    /*
+                      Parameters: 
+                        - orientation: N, R, I, B
+                        - height: 10
+                        - print human readable: Y, N
+                        - print above: Y, N
+                    */
+                    state.barcode.orientation = args[0] || state.barcode.orientation
+                    state.barcode.height = parseInt(args[1]) || state.barcode.default_height
+                    state.barcode.print_human_readable = args[2] ? args[2] === 'Y' : false
+                    state.barcode.print_above = args[3] ? args[3] === 'Y' : false
+                    break
+                }
+
+                // PDF417 Barcode
+                case 'B7': { // Format: ^B7o,h,s,c,r,t    Example: '^B7N,100,Y,N,N^FDYourTextHere^FS'
+                    state.barcode.type = command
+                    /*
+                      Parameters: 
+                        - orientation: N, R, I, B
+                        - height: 10
+                        - security level: 0-8
+                        - columns: 0-30
+                        - rows: 3-90
+                        - truncated: Y, N
+                    */
+                    state.barcode.orientation = args[0] || state.barcode.orientation
+                    state.barcode.height = parseInt(args[1]) || state.barcode.default_height
+                    state.barcode.security_level = parseInt(args[2]) || 0
+                    state.barcode.columns = parseInt(args[3]) || 0
+                    state.barcode.rows = parseInt(args[4]) || 3
+                    state.barcode.truncated = args[5] ? args[5] === 'Y' : false
+                    break
+                }
+
+                // EAN-8 Barcode
+                case 'B8': { // Format: ^B8o,h,f,g    Example: '^B8N,100,Y,N^FD12345678^FS'
+                    state.barcode.type = command
+                    /*
+                      Parameters: 
+                        - orientation: N, R, I, B
+                        - height: 10
+                        - print human readable: Y, N
+                        - print above: Y, N
+                    */
+                    state.barcode.orientation = args[0] || state.barcode.orientation
+                    state.barcode.height = parseInt(args[1]) || state.barcode.default_height
+                    state.barcode.print_human_readable = args[2] ? args[2] === 'Y' : true
+                    state.barcode.print_above = args[3] ? args[3] === 'Y' : false
+                    break
+                }
+
+                // UPC-E Barcode
+                case 'B9': { // Format: ^B9o,h,f,g,e    Example:  '^B9N,100,Y,N,N^FD12345678^FS'
+                    state.barcode.type = command
+                    /*
+                      Parameters: 
+                        - orientation: N, R, I, B
+                        - height: 10
+                        - print human readable: Y, N
+                        - print above: Y, N
+                        - check digit: Y, N
+                    */
+                    state.barcode.orientation = args[0] || state.barcode.orientation
+                    state.barcode.height = parseInt(args[1]) || state.barcode.default_height
+                    state.barcode.print_human_readable = args[2] ? args[2] === 'Y' : true
+                    state.barcode.print_above = args[3] ? args[3] === 'Y' : false
+                    state.barcode.check = args[4] ? args[4] === 'Y' : false
+                    break
+                }
+
+                // Code 93 Barcode
+                case 'BA': { // Format: ^BAo,h,f,g,e   Example: '^BAN,100,Y,N,N^FD1234567890^FS'
+                    state.barcode.type = command
+                    /*
+                      Parameters: 
+                        - orientation: N, R, I, B
+                        - height: 10
+                        - print human readable: Y, N
+                        - print above: Y, N
+                        - check digit: Y, N
+                    */
+                    state.barcode.orientation = args[0] || state.barcode.orientation
+                    state.barcode.height = parseInt(args[1]) || state.barcode.default_height
+                    state.barcode.print_human_readable = args[2] ? args[2] === 'Y' : true
+                    state.barcode.print_above = args[3] ? args[3] === 'Y' : false
+                    state.barcode.check = args[4] ? args[4] === 'Y' : false
+                    break
+                }
+
+                // CODABLOCK Barcode
+                case 'BB': { // Format: ^BBo,h,s,c,r,m     Example: '^BBN,100,Y,N,N^FDYourTextHere^FS'
+                    state.barcode.type = command
+                    /*
+                      Parameters: 
+                        - orientation: N, R, I, B
+                        - height: 10
+                        - security level: 0-8
+                        - columns: 0-30
+                        - rows: 3-90
+                        - mode: N, R, I, B
+                    */
+                    state.barcode.orientation = args[0] || state.barcode.orientation
+                    state.barcode.height = parseInt(args[1]) || state.barcode.default_height
+                    state.barcode.security_level = parseInt(args[2]) || 0
+                    state.barcode.columns = parseInt(args[3]) || 0
+                    state.barcode.rows = parseInt(args[4]) || 3
+                    state.barcode.mode = args[5] || 'N'
+                    break
+                }
+
                 // Barcode 128
-                case 'BC': { // Example: '^BCN,80,Y,N,N^FD>:1234567^FS'
+                case 'BC': { // Format: ^BCo,h,f,g,e,m    Example: '^BCN,100,Y,N,N^FD1234567890^FS'
                     state.barcode.type = command
                     /*
                       Parameters: 
@@ -262,7 +524,7 @@
                 }
 
 
-                case 'XZ': break
+                case 'XZ': break // End of label
 
                 default:
                     console.log(`Unknown command: ${command}`)
