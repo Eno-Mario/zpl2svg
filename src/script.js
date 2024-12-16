@@ -269,9 +269,9 @@ const map = (value, in_min, in_max, out_min, out_max) => (value - in_min) * (out
 /** @type { (x: number, y: number, delta: number) => void } */
 const zoom_into_point = (x, y, delta) => {
 
-    const offset_limit = 100000
-    const max_scale = 10
-    const min_scale = 0.1
+    const offset_limit = 1000000
+    const max_scale = 20
+    const min_scale = 0.05
 
     if (x == -1 && y == -1) {
         x = 50
