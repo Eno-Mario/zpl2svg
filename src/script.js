@@ -160,19 +160,20 @@ const download_png = document.getElementById("download-png")
 const zoom_value = document.getElementById('zoom_value')
 const x_value = document.getElementById('x_value')
 const y_value = document.getElementById('y_value')
+const touch_value = document.getElementById('touch_value')
+if (!touch_value) throw new Error("Missing touch_value element")
 if (!code_element || !output_element || !render_element || !button_svg || !button_raw || !div_svg || !div_raw || !span_conversion_time || !download_zpl || !download_svg || !download_png || !zoom_value || !x_value || !y_value) {
     throw new Error("Missing element")
 }
 
-/** @type {{ svg_content: string, element: Element | null, viewBox: number[], viewBoxBase: number[], scale: number, x_offset: number, y_offset: number }} */
+/** @type {{ svg_content: string, element: Element | null, viewBox: { x: number, y: number, width: number, height: number }, viewBoxBase?: { x: number, y: number, width: number, height: number }, scale: number, x_offset: number, y_offset: number }} */
 const state = {
     svg_content: '',
-    viewBox: [0, 0, 1000, 1000],
-    viewBoxBase: [0, 0, 1000, 1000],
+    viewBox: { x: 0, y: 0, width: 1000, height: 1000 },
     element: null,
     scale: 1,
-    x_offset: 100,
-    y_offset: 100,
+    x_offset: 0,
+    y_offset: 0,
 }
 
 // Get mouse position
@@ -194,30 +195,130 @@ const update_mouse_pos = (e) => {
     if (e) {
         mouse_pos.x = e.clientX - left
         mouse_pos.y = e.clientY - top
+        mouse_pos.width = width
+        mouse_pos.height = height
     }
-    mouse_pos.width = width
-    mouse_pos.height = height
-    const viewBoxDimensions = state.viewBox
-    const x = map(mouse_pos.x, 0, mouse_pos.width, viewBoxDimensions[0], viewBoxDimensions[0] + viewBoxDimensions[2])
-    const y = map(mouse_pos.y, 0, mouse_pos.height, viewBoxDimensions[1], viewBoxDimensions[1] + viewBoxDimensions[3])
 
-    if (isDragging) {
+    const x = map(mouse_pos.x, 0, mouse_pos.width, state.viewBox.x, state.viewBox.x + state.viewBox.width)
+    const y = map(mouse_pos.y, 0, mouse_pos.height, state.viewBox.y, state.viewBox.y + state.viewBox.height)
+
+    if (isDragging && e && e.clientX && e.clientY) {
         const dx = e.clientX - start.x
         const dy = e.clientY - start.y
-        start = { x: e.clientX, y: e.clientY }
-        state.viewBox[0] -= dx / state.scale
-        state.viewBox[1] -= dy / state.scale
+        start = { x: e.clientX, y: e.clientY } // Update start position for next move
+        state.viewBox.x -= dx / state.scale
+        state.viewBox.y -= dy / state.scale
         update_zoom_pan()
     }
 
     x_value.innerHTML = x.toFixed(0)
     y_value.innerHTML = y.toFixed(0)
-
 }
 
-render_element.addEventListener("mousemove", update_mouse_pos)
+const touch_points = { valid: 0, x1: 0, y1: 0, x2: 0, y2: 0 }
 
-const map = (value, in_min, in_max, out_min, out_max) => (value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
+render_element.addEventListener("mousemove", update_mouse_pos)
+render_element.addEventListener("touchmove", (e) => {
+    e.preventDefault()
+    const touch = JSON.stringify([...e.touches].map(t => ({ x: t.clientX.toFixed(1), y: t.clientY.toFixed(1) })))
+    // touch_value.innerHTML = touch
+    if (e.touches.length == 1) {
+        update_mouse_pos(e.touches[0])
+        touch_points.valid = 0
+    } else if (e.touches.length == 2) {
+        isDragging = false
+        touch_points.valid++
+        if (touch_points.valid == 1) {
+            touch_points.x1 = e.touches[0].clientX
+            touch_points.y1 = e.touches[0].clientY
+            touch_points.x2 = e.touches[1].clientX
+            touch_points.y2 = e.touches[1].clientY
+        } else {
+            const { x1, y1, x2, y2 } = touch_points
+            const dx1 = e.touches[0].clientX - x1
+            const dy1 = e.touches[0].clientY - y1
+            const dx2 = e.touches[1].clientX - x2
+            const dy2 = e.touches[1].clientY - y2
+
+            const delta = (Math.hypot(dx1, dy1) - Math.hypot(dx2, dy2)) * 0.01
+
+            touch_value.innerHTML = `(${dx1.toFixed(1)}, ${dy1.toFixed(1)}) (${dx2.toFixed(1)}, ${dy2.toFixed(1)}) ${delta.toFixed(1)}`
+
+
+            if (!delta || !Number.isFinite(delta) || delta < -100 || delta > 100) return // Limit zoom to 0.5
+
+
+
+
+            zoom_into_point(-1, -1, delta)
+
+            update_zoom_pan()
+            zoom_value.innerHTML = state.scale.toFixed(1)
+            update_mouse_pos()
+        }
+    } else {
+        isDragging = false
+        touch_points.valid = 0
+    }
+})
+
+const map = (value, in_min, in_max, out_min, out_max) => (value - in_min) * (out_max - out_min) / ((in_max - in_min) || 1) + out_min
+
+// x: 0 to 100 in percentage relative to the width of the element
+// y: 0 to 100 in percentage relative to the height of the element
+/** @type { (x: number, y: number, delta: number) => void } */
+const zoom_into_point = (x, y, delta) => {
+
+    const offset_limit = 100000
+    const max_scale = 10
+    const min_scale = 0.1
+
+    if (x == -1 && y == -1) {
+        x = 50
+        y = 50
+    }
+
+    // console.log("Zooming in", x, y, delta)
+    const new_scale = state.scale + state.scale * delta * 0.1
+    const scale = Math.max(min_scale, Math.min(max_scale, new_scale));
+    state.scale = scale
+
+    const max_width = (state?.viewBoxBase?.width || 0) * max_scale
+    const max_height = (state?.viewBoxBase?.height || 0) * max_scale
+    const min_width = (state?.viewBoxBase?.width || 0) * min_scale
+    const min_height = (state?.viewBoxBase?.height || 0) * min_scale
+
+    const actual = state.viewBox
+    const original = state.viewBoxBase
+
+    // New viewBox dimensions
+    const newWidth = (original?.width || actual.width) / scale
+    const newHeight = (original?.height || actual.height) / scale
+    const diffWidth = newWidth - actual.width
+    const diffHeight = newHeight - actual.height
+    const new_left = actual.x - diffWidth * x / 100
+    const new_top = actual.y - diffHeight * y / 100
+
+    // Limit values
+    state.viewBox = {
+        x: Math.max(-offset_limit, Math.min(offset_limit, new_left)),
+        y: Math.max(-offset_limit, Math.min(offset_limit, new_top)),
+        width: Math.max(min_width, Math.min(max_width, newWidth)),
+        height: Math.max(min_height, Math.min(max_height, newHeight))
+    }
+
+    // Round to 3 decimal places
+    state.viewBox.x = +(state.viewBox.x || 0).toFixed(3)
+    state.viewBox.y = +(state.viewBox.y || 0).toFixed(3)
+    state.viewBox.width = +(state.viewBox.width || 0).toFixed(3)
+    state.viewBox.height = +(state.viewBox.height || 0).toFixed(3)
+
+    state.scale = (state.scale || 1)
+
+    update_zoom_pan()
+    zoom_value.innerHTML = state.scale.toFixed(1)
+    update_mouse_pos()
+}
 
 // @ts-ignore
 render_element.onmousewheel = function (e) {
@@ -225,37 +326,12 @@ render_element.onmousewheel = function (e) {
     // Zoom in or out based on the cursor position on the current visible screen, limit zoom to 0.1 - 10
     const delta = Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail)));
     if (delta == 0) return;
-    const scale = Math.max(0.1, Math.min(10, state.scale + state.scale * delta * 0.1));
-    state.scale = scale
 
-    const viewBoxWidth = state.viewBoxBase[2] - state.viewBoxBase[0]
-    const viewBoxHeight = state.viewBoxBase[3] - state.viewBoxBase[1]
+    // Cursor position on the current visible screen scaled to viewBox dimensions
+    const x = map(mouse_pos.x, 0, mouse_pos.width, 0, 100) // 0 to 100% relative to last viewBox dimensions
+    const y = map(mouse_pos.y, 0, mouse_pos.height, 0, 100) // 0 to 100% relative to last viewBox dimensions
 
-    const x = map(mouse_pos.x, 0, mouse_pos.width, 0, 100)
-    const y = map(mouse_pos.y, 0, mouse_pos.height, 0, 100)
-
-    const newWidth = viewBoxWidth / scale
-    const newHeight = viewBoxHeight / scale
-
-    const diffWidth = newWidth - viewBoxWidth
-    const diffHeight = newHeight - viewBoxHeight
-
-    const newX = state.viewBoxBase[0] - diffWidth * x / 100
-    const newY = state.viewBoxBase[1] - diffHeight * y / 100
-
-    const limit = 100000
-
-    state.viewBox = [
-        Math.max(-limit, Math.min(limit, newX)),
-        Math.max(-limit, Math.min(limit, newY)),
-        newWidth,
-        newHeight
-    ]
-
-
-    update_zoom_pan()
-    zoom_value.innerHTML = state.scale.toFixed(1)
-    update_mouse_pos()
+    zoom_into_point(x, y, delta)
 }
 
 render_element.addEventListener("mousedown", (e) => {
@@ -265,13 +341,26 @@ render_element.addEventListener("mousedown", (e) => {
     isDragging = true
     start = { x: e.clientX, y: e.clientY }
 })
-
-render_element.addEventListener("mouseup", () => {
-    isDragging = false
+// On touch devices
+render_element.addEventListener("touchstart", (e) => {
+    if (e.touches.length) {
+        e.preventDefault()
+        isDragging = true
+        start = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+    }
 })
 
+render_element.addEventListener("mouseup", (e) => { if (isDragging) e.preventDefault(); isDragging = false })
+render_element.addEventListener("mouseleave", (e) => { isDragging = false })
+render_element.addEventListener("touchend", (e) => { if (isDragging) e.preventDefault(); isDragging = false })
+
+/* disable right click */
+render_element.addEventListener('contextmenu', e => e.preventDefault());
+
 const update_zoom_pan = () => {
-    if (state.element) state.element.setAttribute("viewBox", state.viewBox.join(" "))
+    const { x, y, width, height } = state.viewBox
+    const viewBox = [x, y, width, height].map(v => v.toFixed(3)).join(" ")
+    if (state.element) state.element.setAttribute("viewBox", viewBox)
 }
 
 update_zoom_pan()
@@ -299,11 +388,11 @@ const update_svg = () => {
         download_png.classList.remove("hidden")
         const exists = state.element
         state.element = document.querySelector(".custom-svg-window")
-        if (!exists && state.element) {
+        if (!exists && state.element && !state.viewBoxBase) {
             const viewBox = state.element.getAttribute("viewBox") || "0 0 1000 1000"
             const [x, y, width, height] = viewBox.split(" ").map(parseFloat)
-            state.viewBoxBase = [x, y, width, height]
-            state.viewBox = [x, y, width, height]
+            state.viewBoxBase = { x, y, width, height }
+            state.viewBox = { x, y, width, height }
         }
         update_zoom_pan()
     }, refresh_count == 1 ? 0 : 50)
