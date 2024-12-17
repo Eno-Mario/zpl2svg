@@ -106,6 +106,9 @@
             switch (command) {
                 case 'XA': break // Start of label
 
+                case 'PR': break // Print Rate
+
+
                 case 'FX': svg.push(`<!-- ${args.join(',')} -->`); break // Comment
 
                 case 'FS': break // End of field
@@ -121,7 +124,8 @@
                 case 'GB': { // Graphic Box
                     const width = parseInt(args[0])
                     const height = parseInt(args[1])
-                    const inset = parseInt(args[2])
+                    const inset = parseInt(args[2]) || 0
+                    const radius = parseInt(args[3]) || 0
                     // Draw shape with inset except when inset > width/2 or height/2 then just draw a rectangle with fill
                     const params = encodeURI(JSON.stringify({
                         x: state.position.x,
@@ -146,14 +150,10 @@
 
                     let rect
                     if (full) {
-                        rect = `<rect type="rect" x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}"/>`
+                        rect = `<rect type="rect" x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" ${radius ? `rx="${radius}px" ry="${radius}px" stroke="${stroke}" stroke-width="1"` : ''}/>`
                     } else {
-                        // Draw 4 rectangles (top, right, bottom, left)
-                        const top = `  <rect x="${x}" y="${y}" width="${w}" height="${i}" fill="${fill}"/>`
-                        const right = `  <rect x="${x + w - i}" y="${y}" width="${i}" height="${h}"/>`
-                        const bottom = `  <rect x="${x}" y="${y + h - i}" width="${w}" height="${i}"/>`
-                        const left = `  <rect x="${x}" y="${y}" width="${i}" height="${h}"/>`
-                        rect = [`<g type="rect" params="${params}">`, top, right, bottom, left, '</g>'].join('\n')
+                        const r = radius - i / 2
+                        rect = `<rect type="rect" x="${x + i / 2}" y="${y + i / 2}" width="${w - i}" height="${h - i}" fill="none" stroke="${stroke}" stroke-width="${i}" ${r !== 0 ? `rx="${r}px" ry="${r}px"` : ''}/>`
                     }
 
 
