@@ -1,14 +1,14 @@
 
 /* This is a very simple ZPL to SVG converter written in pure JavaScript. */
-
+// @ts-check
 "use strict";
-(function (root, factory) {
-    if (typeof define === 'function' && define.amd) {
+(function (root, factory) { // @ts-ignore
+    if (typeof define === 'function' && define.amd) { // @ts-ignore
         define([bwipjs], factory);
     } else if (typeof module === 'object' && module.exports) {
         const bwipjs = require('bwip-js')
         module.exports = factory(bwipjs);
-    } else {
+    } else { // @ts-ignore
         root.zplToSvg = factory(bwipjs);
     }
 }(typeof self !== 'undefined' ? self : this, function (bwipjs) {
