@@ -89,7 +89,7 @@
         svg.push(`<svg ${custom_class ? `class="${custom_class}"` : ''} width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" style="dominant-baseline: hanging;">`)
         svg.push(`<rect x="0" y="0" width="100%" height="100%" fill="white"/>`)
         svg.push(`<g transform="scale(${scale}) translate(${x_offset}, ${y_offset})">`)
-     
+
 
         // Track inversion regions
         let inversionMasks = []
@@ -211,7 +211,7 @@
                             rotate: state.barcode.orientation === 'B' ? 'L' : state.barcode.orientation,
                         }
                         if (alttext && state.barcode.print_human_readable) barcode_options.alttext = alttext
-                        if (bcid === 'azteccode') {
+                        if (bcid === 'azteccode') { // @ts-ignore
                             delete barcode_options.height
                             barcode_options.scale *= state.barcode.magnification / 4
                             barcode_options.format = 'full'
@@ -229,7 +229,15 @@
                         }
 
                         // @ts-ignore
-                        const barcode = bwipjs.toSVG(barcode_options)
+                        let barcode = ''
+                        try {
+                            barcode = bwipjs.toSVG(barcode_options)
+                        } catch (e) {
+                            console.log(`Failed to generate barcode: ${state.barcode.type} with value: ${value}`)
+                            console.log(e)
+                            state.barcode.type = '' // Reset barcode type to prevent drawing barcode on next text field
+                            break
+                        }
 
                         // <svg viewBox="0 0 WIDTH HEIGHT" ...
                         // Extract the width and height from the viewBox attribute
