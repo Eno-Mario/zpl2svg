@@ -199,7 +199,7 @@
                         const barcode_options = {
                             bcid,
                             text: value,
-                            height: state.barcode.height * scale_multiplier / (6 * scale_multiplier) / scale_multiplier,
+                            height: state.barcode.height * scale_multiplier / (3 * scale_multiplier) / scale_multiplier,
                             paddingtop: 0,
                             paddingbottom: 0,
                             paddingleft: 0,
@@ -207,7 +207,7 @@
                             includetext: state.barcode.print_human_readable,
                             textxalign: 'center',
                             textcolor: '#000',
-                            scale: 2 * scale_multiplier,
+                            scale: scale_multiplier,
                             rotate: state.barcode.orientation === 'B' ? 'L' : state.barcode.orientation,
                         }
                         if (alttext && state.barcode.print_human_readable) barcode_options.alttext = alttext
@@ -282,9 +282,9 @@
 
 
                 case 'BY': { // Barcode Field Default Parameters
-                    state.barcode.width = parseInt(args[0]) || state.barcode.width
+                    state.barcode.barscale = parseInt(args[0]) || state.barcode.barscale
                     // state.barcode.ratio = parseInt(args[1]) || state.barcode.ratio
-                    state.barcode.barscale = parseInt(args[1]) || state.barcode.barscale
+                    state.barcode.width = parseInt(args[1]) || state.barcode.width
                     state.barcode.default_height = parseInt(args[2]) || state.barcode.default_height
                     break
                 }
