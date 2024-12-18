@@ -45,6 +45,73 @@
         }
     }
 
+    /** @type { (input: string) => (number | ',')[] } */
+    const decodeRLE = input => {
+        /** @type { string[] } */
+        const half_bytes = []
+    
+        input = input.replace(/[ \t\n]/g, '').toUpperCase();
+        const char_array = input.split('');
+    
+        const push = (n, c) => {
+            for (let i = 0; i < n; i++) {
+                half_bytes.push(c);
+            }
+        }
+    
+        const cc = c => c.charCodeAt(0)
+    
+        const I_code = cc('I')
+    
+        const is_special = c => c && cc(c) >= I_code
+        const special_repeat = c => c && is_special(c) ? cc(c) - I_code + 3 : 1
+    
+        while (char_array.length) {
+            const c0 = char_array.shift() || '';
+            const c1 = char_array[0] || '';
+            const last = !c1 || c1 === ',';
+            if (c0 === ',') {
+                push(1, ',')
+                continue;
+            }
+            if (is_special(c0)) {
+                const repeat = special_repeat(c0)
+                const next = char_array.shift();
+                push(repeat, next);
+                continue;
+            }
+            if (is_special(c1)) {
+                push(1, c0);
+                continue;
+            }
+            if (last) {
+                push(1, c0);
+                continue;
+            }
+            push(1, c0);
+        }
+        /** @type { ( number | ',' )[] } */
+        const full_bytes = [];
+        for (let i = 0; i < half_bytes.length; i += 2) {
+            const b0 = half_bytes[i] === ',' ? ',' : parseInt(half_bytes[i], 16);
+            const b1 = half_bytes[i + 1] === ',' ? ',' : parseInt(half_bytes[i + 1], 16);
+    
+            if (b0 === ',') {
+                full_bytes.push(b0);
+                i--;
+                continue;
+            }
+            if (b1 === ',') {
+                full_bytes.push(b0 << 4);
+                full_bytes.push(b1);
+                continue;
+            }
+            full_bytes.push((b0 << 4) | b1);
+            
+        }
+        return full_bytes;
+    }
+
     /** @type { (zpl: string, options?: { width?: number, height?: number, scale?: number, x_offset?: number, y_offset?: number, custom_class?: string }) => string } */
     const zplToSvg = (zpl, options) => {
         options = options || {}
@@ -150,7 +217,7 @@
 
                     let rect
                     if (full) {
-                        rect = `<rect type="rect" x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" ${radius ? `rx="${radius}px" ry="${radius}px" stroke="${stroke}" stroke-width="1"` : ''}/>`
+                        rect = `<rect type="rect" x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" ${radius > 0 ? `rx="${radius}px" ry="${radius}px" stroke="${stroke}" stroke-width="1"` : ''}/>`
                     } else {
                         const r = radius - i / 2
                         rect = `<rect type="rect" x="${x + i / 2}" y="${y + i / 2}" width="${w - i}" height="${h - i}" fill="none" stroke="${stroke}" stroke-width="${i}" ${r !== 0 ? `rx="${r}px" ry="${r}px"` : ''}/>`
@@ -170,7 +237,7 @@
                     let value = args.join(',')
                     if (state.barcode.type) {
                         let bcid = ''
-                        let scale_multiplier = state.barcode.barscale
+                        const scale = state.barcode.barscale
                         let alttext = ''
                         switch (state.barcode.type) {
                             case 'B0': bcid = 'azteccode'; break // TODO: Finish azteccode, partial implementation
@@ -185,7 +252,7 @@
                             case 'BA': bcid = 'code93'; break // Works
                             case 'BB': bcid = 'codablockf'; break // Works
                             // case 'BC': bcid = 'code128'; break // Not exactly the same
-                            case 'BC': bcid = 'hibccode128'; scale_multiplier *= 1; alttext = value; break // I don't know why but this works
+                            case 'BC': bcid = 'hibccode128'; alttext = value; break // Works
                             default: break
                         }
                         if (!bcid) {
@@ -199,7 +266,7 @@
                         const barcode_options = {
                             bcid,
                             text: value,
-                            height: state.barcode.height * scale_multiplier / (3 * scale_multiplier) / scale_multiplier,
+                            height: state.barcode.height * (1 / scale / 3),
                             paddingtop: 0,
                             paddingbottom: 0,
                             paddingleft: 0,
@@ -207,7 +274,7 @@
                             includetext: state.barcode.print_human_readable,
                             textxalign: 'center',
                             textcolor: '#000',
-                            scale: scale_multiplier,
+                            scale: scale,
                             rotate: state.barcode.orientation === 'B' ? 'L' : state.barcode.orientation,
                         }
                         if (alttext && state.barcode.print_human_readable) barcode_options.alttext = alttext
@@ -534,6 +601,132 @@
 
                     break
                 }
+
+                // Graphic Field
+                case 'GF': { // Format: ^GFa,b,c,d,DATA   Example: '^FO50,50^GFA,128,128,4,C,4J0FF84I03CCE401C73F24073CDBE60C1F21E3F804EFCJ0730400FFCF0403B3360407JC0C0JFC080JF81,07IF03,03FFE06,00FF80DEI0F01FA1F80069A1FE01FB61JFDE400IF61800IFC7,01IF84,07F7FE781FFE3F0C1FE117041FE193841FC0930C0F00B318I01661,J0FE1EJ03003^FS'
+
+                    /*
+                        - a: compression type (A, B, C)
+                        - b: binary byte count
+                        - c: graphic field count
+                        - d: bytes per row
+                    */
+
+                    const [compression, binary_byte_count, graphic_field_count, bytesPerRow, ...data] = args
+                    const graphic = data.join(',')
+
+                    if (compression === 'A') {
+                        // Decompress the ZPL RLE image data
+                        const decompressedDataBytes = decodeRLE(graphic);
+                        let idx = 0
+                        console.log(`Graphic Field ${[compression, binary_byte_count, graphic_field_count, bytesPerRow].join(',')}: ${graphic_field_count} with ${decompressedDataBytes.length} bytes decompressed`)
+                        const width = parseInt(bytesPerRow) * 8
+                        const height = +bytesPerRow > 0 ? decompressedDataBytes.length / parseInt(bytesPerRow) : 0
+                        const pixelData = new Array(width * height).fill(0)
+                        for (let y = 0; y < height; y++) {
+                            for (let x = 0; x < width; x++) {
+                                const bitIndex = 7 - (x % 8)
+                                if (!(x === 0 && y === 0) && x % 8 === 0) idx++
+                                const byte = decompressedDataBytes[idx]
+                                if (byte === ',') { // Go to next row
+                                    break
+                                }
+                                const bit = (byte >> bitIndex) & 1
+                                pixelData[y * width + x] = bit
+                            }
+                        }
+                        // // Trace islands of black pixels to create SVG paths for each island using depth-first search
+                        // const islands = []
+                        // const visited = new Set()
+                        // const stack = []
+                        // const directions = [[0, -1], [1, 0], [0, 1], [-1, 0]]
+                        // const isBlack = (x, y) => pixelData[y * width + x] === 1
+                        // const isVisited = (x, y) => visited.has(`${x},${y}`)
+                        // const visit = (x, y) => visited.add(`${x},${y}`)
+                        // const push = (x, y) => stack.push([x, y])
+                        // const pop = () => stack.pop()
+                        // const isValid = (x, y) => x >= 0 && x < width && y >= 0 && y < height
+                        // const trace = (x, y) => {
+                        //     const island = []
+                        //     push(x, y)
+                        //     while (stack.length) {
+                        //         const [x, y] = pop()
+                        //         if (isVisited(x, y)) continue
+                        //         visit(x, y)
+                        //         island.push([x, y])
+                        //         for (const [dx, dy] of directions) {
+                        //             const nx = x + dx
+                        //             const ny = y + dy
+                        //             if (isValid(nx, ny) && isBlack(nx, ny) && !isVisited(nx, ny)) {
+                        //                 push(nx, ny)
+                        //             }
+                        //         }
+                        //     }
+                        //     if (island.length > 0) islands.push(island)
+                        // }
+                        // for (let y = 0; y < height; y++) {
+                        //     for (let x = 0; x < width; x++) {
+                        //         if (isBlack(x, y) && !isVisited(x, y)) {
+                        //             trace(x, y)
+                        //         }
+                        //     }
+                        // }
+
+                        // // Convert islands to SVG paths inside a g
+                        // const params = encodeURI(JSON.stringify({
+                        //     x: state.position.x,
+                        //     y: state.position.y,
+                        //     w: width,
+                        //     h: height,
+                        //     f: state.fill,
+                        //     s: state.stroke,
+                        // }))
+                        // svg.push(`<g x="${state.position.x}" y="${state.position.y}" type="graphic" params="${params}">`)
+                        // for (const island of islands) {
+                        //     const path = []
+                        //     for (let i = 0; i < island.length; i++) {
+                        //         const [x, y] = island[i]
+                        //         if (i === 0) {
+                        //             path.push(`M ${x + state.position.x} ${y + state.position.y}`)
+                        //         } else {
+                        //             path.push(`L ${x + state.position.x} ${y + state.position.y}`)
+                        //         }
+                        //     }
+                        //     path.push('Z')
+                        //     svg.push(`<path d="${path.join(' ')}" fill="${state.fill}" stroke="${state.stroke}" />`)
+                        // }
+                        // svg.push('</g>')
+
+                        // Draw the image as a bitmap
+                        const params = encodeURI(JSON.stringify({
+                            x: state.position.x,
+                            y: state.position.y,
+                            w: width,
+                            h: height,
+                            f: state.fill,
+                            s: state.stroke,
+                        }))
+                        svg.push(`<g x="${state.position.x}" y="${state.position.y}" type="graphic" params="${params}">`)
+                        for (let y = 0; y < height; y++) {
+                            for (let x = 0; x < width; x++) {
+                                const bit = pixelData[y * width + x]
+                                if (bit === 1) {
+                                    svg.push(`<rect x="${state.position.x + x}" y="${state.position.y + y}" width="1" height="1" fill="${state.fill}" />`)
+                                }
+                            }
+                        }
+                        svg.push('</g>')
+
+
+                    } else if (compression === 'B') {
+
+                    } else {
+                        console.log(`Unknown compression: ${compression}`)
+                    }
+
+                    break
+                }
+
 
 
                 case 'XZ': break // End of label
