@@ -45,38 +45,44 @@
         }
     }
 
-    /** @type { (input: string) => (number | ',')[] } */
+    const seperators = [',', '!', ':']
+
+    /** @type { (input: string) => (number | ',' | '!' | ':')[] } */
     const decodeRLE = input => {
         /** @type { string[] } */
         const half_bytes = []
-    
-        input = input.replace(/[ \t\n]/g, '').toUpperCase();
+
+        input = input.replace(/[ \t\n]/g, '')
         const char_array = input.split('');
-    
+
         const push = (n, c) => {
             for (let i = 0; i < n; i++) {
                 half_bytes.push(c);
             }
         }
-    
+
         const cc = c => c.charCodeAt(0)
-    
+
         const I_code = cc('I')
-    
+
         const is_special = c => c && cc(c) >= I_code
         const special_repeat = c => c && is_special(c) ? cc(c) - I_code + 3 : 1
-    
+
         while (char_array.length) {
             const c0 = char_array.shift() || '';
             const c1 = char_array[0] || '';
-            const last = !c1 || c1 === ',';
-            if (c0 === ',') {
-                push(1, ',')
+            if (seperators.includes(c0)) {
+                push(1, c0)
                 continue;
             }
+
             if (is_special(c0)) {
-                const repeat = special_repeat(c0)
-                const next = char_array.shift();
+                let repeat = special_repeat(c0)
+                let next = char_array.shift();
+                while (is_special(next)) {
+                    repeat += special_repeat(next)
+                    next = char_array.shift();
+                }
                 push(repeat, next);
                 continue;
             }
@@ -84,32 +90,14 @@
                 push(1, c0);
                 continue;
             }
-            if (last) {
-                push(1, c0);
-                continue;
-            }
             push(1, c0);
         }
-        /** @type { ( number | ',' )[] } */
-        const full_bytes = [];
-        for (let i = 0; i < half_bytes.length; i += 2) {
-            const b0 = half_bytes[i] === ',' ? ',' : parseInt(half_bytes[i], 16);
-            const b1 = half_bytes[i + 1] === ',' ? ',' : parseInt(half_bytes[i + 1], 16);
-    
-            if (b0 === ',') {
-                full_bytes.push(b0);
-                i--;
-                continue;
-            }
-            if (b1 === ',') {
-                full_bytes.push(b0 << 4);
-                full_bytes.push(b1);
-                continue;
-            }
-            full_bytes.push((b0 << 4) | b1);
-            
-        }
-        return full_bytes;
+        return half_bytes.map(c => {
+            if (c === ',') return ','
+            if (c === '!') return '!'
+            if (c === ':') return ':'
+            return parseInt(c, 16)
+        });
     }
 
     /** @type { (zpl: string, options?: { width?: number, height?: number, scale?: number, x_offset?: number, y_offset?: number, custom_class?: string }) => string } */
@@ -615,26 +603,41 @@
                     const [compression, binary_byte_count, graphic_field_count, bytesPerRow, ...data] = args
                     const graphic = data.join(',')
 
+
                     if (compression === 'A') {
                         // Decompress the ZPL RLE image data
-                        const decompressedDataBytes = decodeRLE(graphic);
+                        const decompressedDataHalfBytes = decodeRLE(graphic);
                         let idx = 0
-                        console.log(`Graphic Field ${[compression, binary_byte_count, graphic_field_count, bytesPerRow].join(',')}: ${graphic_field_count} with ${decompressedDataBytes.length} bytes decompressed`)
+                        console.log(`Graphic Field ${[compression, binary_byte_count, graphic_field_count, bytesPerRow].join(',')}: ${graphic_field_count} with ${decompressedDataHalfBytes.length} half bytes decompressed`)
                         const width = parseInt(bytesPerRow) * 8
-                        const height = +bytesPerRow > 0 ? decompressedDataBytes.length / parseInt(bytesPerRow) : 0
-                        const pixelData = new Array(width * height).fill(0)
-                        for (let y = 0; y < height; y++) {
+                        const rows = (parseInt(graphic_field_count) / (parseInt(bytesPerRow) || 1)) || Infinity
+                        const height_limit = +bytesPerRow > 0 ? decompressedDataHalfBytes.length / 2 / parseInt(bytesPerRow) : 0
+                        const pixelData = new Array(width * rows).fill(0)
+                        for (let y = 0; y < rows; y++) {
+                            if (height_limit && y >= height_limit) break
                             for (let x = 0; x < width; x++) {
-                                const bitIndex = 7 - (x % 8)
-                                if (!(x === 0 && y === 0) && x % 8 === 0) idx++
-                                const byte = decompressedDataBytes[idx]
-                                if (byte === ',') { // Go to next row
+                                const bitIndex = 3 - (x % 4)
+                                if (!(x === 0 && y === 0) && x % 4 === 0) idx++
+                                const byte = decompressedDataHalfBytes[idx]
+                                if (typeof byte === 'undefined') break
+                                if (byte === ',') break
+                                if (byte === '!' || byte === ':') {
+                                    const bit = byte === '!' ? 1 : 0
+                                    for (let i = x; i < width; i++) {
+                                        pixelData[y * width + i] = bit
+                                    }
                                     break
                                 }
-                                const bit = (byte >> bitIndex) & 1
-                                pixelData[y * width + x] = bit
+                                if (typeof byte === 'number') {
+                                    const bit = (byte >> bitIndex) & 1
+                                    pixelData[y * width + x] = bit
+                                }
                             }
                         }
+                        console.log(`decompressedDataHalfBytes:`, decompressedDataHalfBytes.map(c => typeof c === 'number' ? c.toString(16).toUpperCase() : c))
+                        console.log(`width: ${width}, height: ${height}, rows: ${rows}`)
+                        console.log(`pixelData:`, pixelData)
+
                         // // Trace islands of black pixels to create SVG paths for each island using depth-first search
                         // const islands = []
                         // const visited = new Set()
@@ -711,7 +714,11 @@
                             for (let x = 0; x < width; x++) {
                                 const bit = pixelData[y * width + x]
                                 if (bit === 1) {
-                                    svg.push(`<rect x="${state.position.x + x}" y="${state.position.y + y}" width="1" height="1" fill="${state.fill}" />`)
+                                    let next = x + 1
+                                    while (next < width && pixelData[y * width + next] === 1) next++
+                                    const rect = `<rect x="${state.position.x + x}" y="${state.position.y + y}" width="${(next - x) || 1}" height="1" fill="${state.fill}" />`
+                                    svg.push(rect)
+                                    x = next
                                 }
                             }
                         }
