@@ -63,10 +63,19 @@
 
         const cc = c => c.charCodeAt(0)
 
-        const I_code = cc('I')
+        const G = cc('G')
+        const Z = cc('Z')
+        const g = cc('g')
+        const z = cc('z')
 
-        const is_special = c => c && cc(c) >= I_code
-        const special_repeat = c => c && is_special(c) ? cc(c) - I_code + 3 : 1
+        const special_add = character => {
+            if (!character) return 0
+            const c = cc(character)
+            if (c >= G && c < Z) return c - G + 1
+            if (c >= g && c <= z) return (c - g + 1) * 20
+            if (c >= G) return 1
+            return 0
+        }
 
         while (char_array.length) {
             const c0 = char_array.shift() || '';
@@ -76,17 +85,17 @@
                 continue;
             }
 
-            if (is_special(c0)) {
-                let repeat = special_repeat(c0)
+            if (special_add(c0)) {
+                let repeat = special_add(c0)
                 let next = char_array.shift();
-                while (is_special(next)) {
-                    repeat += special_repeat(next)
+                while (special_add(next)) {
+                    repeat += special_add(next)
                     next = char_array.shift();
                 }
                 push(repeat, next);
                 continue;
             }
-            if (is_special(c1)) {
+            if (special_add(c1)) {
                 push(1, c0);
                 continue;
             }
@@ -100,7 +109,7 @@
         });
     }
 
-    /** @type { (zpl: string, options?: { width?: number, height?: number, scale?: number, x_offset?: number, y_offset?: number, custom_class?: string }) => string } */
+    /** @type { (zpl: string, options?: { width?: number, height?: number, scale?: number, x_offset?: number, y_offset?: number, custom_class?: string, debug?: boolean }) => string } */
     const zplToSvg = (zpl, options) => {
         options = options || {}
         const lines = zpl.split("\n").map(line => line.split('//')[0].trim()).filter(line => line.length > 0).join('').split('^').map(line => line.trim()).filter(line => line.length > 0)
@@ -111,6 +120,7 @@
         const x_offset = options.x_offset || 0
         const y_offset = options.y_offset || 0
         const custom_class = options.custom_class || ''
+        const debug = options.debug || false
         const state = {
             font: {
                 family: "Arial",
@@ -608,23 +618,33 @@
                         // Decompress the ZPL RLE image data
                         const decompressedDataHalfBytes = decodeRLE(graphic);
                         let idx = 0
-                        console.log(`Graphic Field ${[compression, binary_byte_count, graphic_field_count, bytesPerRow].join(',')}: ${graphic_field_count} with ${decompressedDataHalfBytes.length} half bytes decompressed`)
+                        if (debug) console.log(`Graphic Field ${[compression, binary_byte_count, graphic_field_count, bytesPerRow].join(',')}: ${graphic_field_count} with ${decompressedDataHalfBytes.length} half bytes decompressed`)
                         const width = parseInt(bytesPerRow) * 8
-                        const rows = (parseInt(graphic_field_count) / (parseInt(bytesPerRow) || 1)) || Infinity
-                        const height_limit = +bytesPerRow > 0 ? decompressedDataHalfBytes.length / 2 / parseInt(bytesPerRow) : 0
-                        const pixelData = new Array(width * rows).fill(0)
-                        for (let y = 0; y < rows; y++) {
-                            if (height_limit && y >= height_limit) break
+                        const height = (parseInt(graphic_field_count) / (parseInt(bytesPerRow) || 1)) || Infinity
+
+                        const pixelData = new Array(width * height).fill(0)
+                        for (let y = 0; y < height; y++) {
                             for (let x = 0; x < width; x++) {
                                 const bitIndex = 3 - (x % 4)
                                 if (!(x === 0 && y === 0) && x % 4 === 0) idx++
                                 const byte = decompressedDataHalfBytes[idx]
                                 if (typeof byte === 'undefined') break
                                 if (byte === ',') break
-                                if (byte === '!' || byte === ':') {
-                                    const bit = byte === '!' ? 1 : 0
+                                if (byte === '!') {
                                     for (let i = x; i < width; i++) {
-                                        pixelData[y * width + i] = bit
+                                        pixelData[y * width + i] = 1
+                                    }
+                                    break
+                                }
+                                if (byte === ':') {
+                                    if (y === 0) {
+                                        for (let i = 0; i < width; i++) {
+                                            pixelData[y * width + i] = 0
+                                        }
+                                    } else {
+                                        for (let i = 0; i < width; i++) {
+                                            pixelData[y * width + i] = pixelData[(y - 1) * width + i]
+                                        }
                                     }
                                     break
                                 }
@@ -634,9 +654,11 @@
                                 }
                             }
                         }
-                        console.log(`decompressedDataHalfBytes:`, decompressedDataHalfBytes.map(c => typeof c === 'number' ? c.toString(16).toUpperCase() : c))
-                        console.log(`width: ${width}, height: ${height}, rows: ${rows}`)
-                        console.log(`pixelData:`, pixelData)
+                        if (debug) {
+                            console.log(`decompressedDataHalfBytes:`, decompressedDataHalfBytes.map(c => typeof c === 'number' ? c.toString(16).toUpperCase() : c))
+                            console.log(`width: ${width}, height: ${height}`)
+                            console.log(`pixelData:`, pixelData)
+                        }
 
                         // // Trace islands of black pixels to create SVG paths for each island using depth-first search
                         // const islands = []
