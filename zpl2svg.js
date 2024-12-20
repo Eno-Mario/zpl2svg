@@ -109,6 +109,131 @@
         });
     }
 
+    let parameter_serial = 0
+    /** @type { { serial: number, parameters: string, path: string }[] }  */
+    const preRenderedPaths = []
+
+
+    /** @type { (bitmap: number[], width: number, height: number, x_offset: number, y_offset: number, parameters: string) => string } */
+    const generateSVGPaths = (bitmap, width, height, x_offset, y_offset, parameters) => {
+        parameter_serial++
+
+        for (const path of preRenderedPaths) {
+            if (path.parameters === parameters) {
+                path.serial = parameter_serial
+                return path.path
+            }
+        }
+        // // Depth first search to find connected pixels (Work in progress)
+        // const visited = new Array(bitmap.length).fill(false);
+        // const directions = [
+        //     [0, 1], [1, 0], [0, -1], [-1, 0]
+        // ];
+
+        // function isValid(x, y) {
+        //     return x >= 0 && y >= 0 && x < width && y < height;
+        // }
+
+        // function dfs(x, y, points) {
+        //     const stack = [[x, y]];
+        //     visited[y * width + x] = true;
+
+        //     while (stack.length) {
+        //         const top = stack.pop();
+        //         if (!top) break;
+        //         const [cx, cy] = top;
+        //         points.push([cx, cy]);
+
+        //         for (const [dx, dy] of directions) {
+        //             const nx = cx + dx, ny = cy + dy;
+        //             if (
+        //                 isValid(nx, ny) &&
+        //                 bitmap[ny * width + nx] === 1 &&
+        //                 !visited[ny * width + nx]
+        //             ) {
+        //                 visited[ny * width + nx] = true;
+        //                 stack.push([nx, ny]);
+        //             }
+        //         }
+        //     }
+        // }
+
+        // function createPath(points) {
+        //     const path = [];
+        //     const seen = new Set(points.map(([x, y]) => `${x},${y}`));
+
+        //     for (const [x, y] of points) {
+        //         if (!seen.has(`${x - 1},${y}`)) {
+        //             path.push(`M ${x + x_offset} ${y + y_offset} L ${x + x_offset} ${y + 1 + y_offset}`);
+        //         }
+        //         if (!seen.has(`${x + 1},${y}`)) {
+        //             path.push(`M ${x + 1 + x_offset} ${y + y_offset} L ${x + 1 + x_offset} ${y + 1 + y_offset}`);
+        //         }
+        //         if (!seen.has(`${x},${y - 1}`)) {
+        //             path.push(`M ${x + x_offset} ${y + y_offset} L ${x + 1 + x_offset} ${y + y_offset}`);
+        //         }
+        //         if (!seen.has(`${x},${y + 1}`)) {
+        //             path.push(`M ${x + x_offset} ${y + 1 + y_offset} L ${x + 1 + x_offset} ${y + 1 + y_offset}`);
+        //         }
+        //     }
+
+        //     return path.join(" ");
+        // }
+
+        // function createInfill(points) {
+        //     const path = [`M ${points[0][0] + x_offset} ${points[0][1] + y_offset}`];
+        //     for (let i = 1; i < points.length; i++) {
+        //         path.push(`L ${points[i][0] + x_offset} ${points[i][1] + y_offset}`);
+        //     }
+        //     path.push("Z");
+        //     return path.join(" ");
+        // }
+
+        // let paths = "";
+        // for (let y = 0; y < height; y++) {
+        //     for (let x = 0; x < width; x++) {
+        //         if (bitmap[y * width + x] === 1 && !visited[y * width + x]) {
+        //             const points = [];
+        //             dfs(x, y, points);
+        //             // Draw outline only
+        //             // paths += `<path d="${createPath(points)}" fill="none" stroke="black" stroke-width="0.2" />\n`;
+        //             // Draw filled
+        //             // paths += `<path d="${createPath(points)}" fill="black" stroke="none" />\n`;
+        //             // paths += `<path d="M ${points.map(([x, y]) => `${x + x_offset} ${y + y_offset}`).join(" L ")} Z" fill="black" stroke="none" />\n`;
+        //             paths += `<path d="${createInfill(points)}" fill="black" stroke="none" />\n`;
+        //         }
+        //     }
+        // }
+
+
+        // Use run length encoding to generate rectangles with variable width
+        let paths = ''
+        for (let i = 0; i < height; i++) {
+            let j = 0
+            while (j < width) {
+                if (bitmap[i * width + j] === 1) {
+                    let start = j
+                    while (j < width && bitmap[i * width + j] === 1) j++
+                    paths += `<rect x="${start + x_offset}" y="${i + y_offset}" width="${j - start}" height="1" fill="black" />\n`
+                }
+                j++
+            }
+        }
+
+        if (preRenderedPaths.length > 50) { // Limit the number of pre-rendered paths to 100
+            preRenderedPaths.sort((a, b) => a.serial - b.serial) // Sort by serial number ascending
+            preRenderedPaths.shift() // Remove the oldest path
+        }
+
+        preRenderedPaths.push({
+            serial: parameter_serial,
+            parameters,
+            path: paths
+        })
+
+        return paths;
+    }
+
     /** @type { (zpl: string, options?: { width?: number, height?: number, scale?: number, x_offset?: number, y_offset?: number, custom_class?: string, debug?: boolean }) => string } */
     const zplToSvg = (zpl, options) => {
         options = options || {}
@@ -603,6 +728,14 @@
                 // Graphic Field
                 case 'GF': { // Format: ^GFa,b,c,d,DATA   Example: '^FO50,50^GFA,128,128,4,C,4J0FF84I03CCE401C73F24073CDBE60C1F21E3F804EFCJ0730400FFCF0403B3360407JC0C0JFC080JF81,07IF03,03FFE06,00FF80DEI0F01FA1F80069A1FE01FB61JFDE400IF61800IFC7,01IF84,07F7FE781FFE3F0C1FE117041FE193841FC0930C0F00B318I01661,J0FE1EJ03003^FS'
 
+                    // Reuse pre-rendered paths
+                    const parameter_id = [state.position.x, state.position.y].join(',') + ',' + args.join(',').replace(/[ \t\r\n]/g, '')
+                    const existing = preRenderedPaths.find(p => p.parameters === parameter_id)
+                    if (existing) {
+                        svg.push(existing.path)
+                        break
+                    }
+
                     /*
                         - a: compression type (A, B, C)
                         - b: binary byte count
@@ -614,8 +747,16 @@
                     const graphic = data.join(',')
 
 
+
                     if (compression === 'A') {
-                        // Decompress the ZPL RLE image data
+                        // Check if Z64 compression is used
+                        const z64 = graphic.includes('Z')
+                        if (z64) {
+                            console.log(`Z64 graphic field detected but not yet supported - ask the developer about this feature or implement it yourself and share it with the community :D`)
+                            break
+                        }
+
+                        // Decompress the ZPL ASCII bitmap data
                         const decompressedDataHalfBytes = decodeRLE(graphic);
                         let idx = 0
                         if (debug) console.log(`Graphic Field ${[compression, binary_byte_count, graphic_field_count, bytesPerRow].join(',')}: ${graphic_field_count} with ${decompressedDataHalfBytes.length} half bytes decompressed`)
@@ -660,69 +801,6 @@
                             console.log(`pixelData:`, pixelData)
                         }
 
-                        // // Trace islands of black pixels to create SVG paths for each island using depth-first search
-                        // const islands = []
-                        // const visited = new Set()
-                        // const stack = []
-                        // const directions = [[0, -1], [1, 0], [0, 1], [-1, 0]]
-                        // const isBlack = (x, y) => pixelData[y * width + x] === 1
-                        // const isVisited = (x, y) => visited.has(`${x},${y}`)
-                        // const visit = (x, y) => visited.add(`${x},${y}`)
-                        // const push = (x, y) => stack.push([x, y])
-                        // const pop = () => stack.pop()
-                        // const isValid = (x, y) => x >= 0 && x < width && y >= 0 && y < height
-                        // const trace = (x, y) => {
-                        //     const island = []
-                        //     push(x, y)
-                        //     while (stack.length) {
-                        //         const [x, y] = pop()
-                        //         if (isVisited(x, y)) continue
-                        //         visit(x, y)
-                        //         island.push([x, y])
-                        //         for (const [dx, dy] of directions) {
-                        //             const nx = x + dx
-                        //             const ny = y + dy
-                        //             if (isValid(nx, ny) && isBlack(nx, ny) && !isVisited(nx, ny)) {
-                        //                 push(nx, ny)
-                        //             }
-                        //         }
-                        //     }
-                        //     if (island.length > 0) islands.push(island)
-                        // }
-                        // for (let y = 0; y < height; y++) {
-                        //     for (let x = 0; x < width; x++) {
-                        //         if (isBlack(x, y) && !isVisited(x, y)) {
-                        //             trace(x, y)
-                        //         }
-                        //     }
-                        // }
-
-                        // // Convert islands to SVG paths inside a g
-                        // const params = encodeURI(JSON.stringify({
-                        //     x: state.position.x,
-                        //     y: state.position.y,
-                        //     w: width,
-                        //     h: height,
-                        //     f: state.fill,
-                        //     s: state.stroke,
-                        // }))
-                        // svg.push(`<g x="${state.position.x}" y="${state.position.y}" type="graphic" params="${params}">`)
-                        // for (const island of islands) {
-                        //     const path = []
-                        //     for (let i = 0; i < island.length; i++) {
-                        //         const [x, y] = island[i]
-                        //         if (i === 0) {
-                        //             path.push(`M ${x + state.position.x} ${y + state.position.y}`)
-                        //         } else {
-                        //             path.push(`L ${x + state.position.x} ${y + state.position.y}`)
-                        //         }
-                        //     }
-                        //     path.push('Z')
-                        //     svg.push(`<path d="${path.join(' ')}" fill="${state.fill}" stroke="${state.stroke}" />`)
-                        // }
-                        // svg.push('</g>')
-
-                        // Draw the image as a bitmap
                         const params = encodeURI(JSON.stringify({
                             x: state.position.x,
                             y: state.position.y,
@@ -731,21 +809,11 @@
                             f: state.fill,
                             s: state.stroke,
                         }))
-                        svg.push(`<g x="${state.position.x}" y="${state.position.y}" type="graphic" params="${params}">`)
-                        for (let y = 0; y < height; y++) {
-                            for (let x = 0; x < width; x++) {
-                                const bit = pixelData[y * width + x]
-                                if (bit === 1) {
-                                    let next = x + 1
-                                    while (next < width && pixelData[y * width + next] === 1) next++
-                                    const rect = `<rect x="${state.position.x + x}" y="${state.position.y + y}" width="${(next - x) || 1}" height="1" fill="${state.fill}" />`
-                                    svg.push(rect)
-                                    x = next
-                                }
-                            }
-                        }
-                        svg.push('</g>')
 
+                        const paths = generateSVGPaths(pixelData, width, height, state.position.x, state.position.y, parameter_id)
+                        svg.push(`<g x="${state.position.x}" y="${state.position.y}" type="graphic" params="${params}">`)
+                        svg.push(paths)
+                        svg.push('</g>')
 
                     } else if (compression === 'B') {
 
