@@ -5,7 +5,7 @@
 
 const zpl_test_sample = `^XA
 ^FX Demo VDA4902 Label Template
-^FX A4 landscape border
+^FX A5 landscape border
 ^FO10,10^GB1200,792,3^FS
 
 ^FX VDA 4902 frame
