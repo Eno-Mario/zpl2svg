@@ -215,7 +215,7 @@
                 if (bitmap[i * width + j] === 1) {
                     let start = j
                     while (j < width && bitmap[i * width + j] === 1) j++
-                    paths += `<rect x="${start + x_offset}" y="${i + y_offset}" width="${j - start}" height="1" fill="${inverted ? '#FFF' : '#000'}" />\n`
+                    paths += `<rect ${inverted ? 'class="zpl-inverted"' : ''} x="${start + x_offset}" y="${i + y_offset}" width="${j - start}" height="1" fill="${inverted ? '#FFF' : '#000'}" />\n`
                 }
                 j++
             }
@@ -286,14 +286,8 @@
        
         svg.push(`
             <style>
-                .isolate {
-                    isolation: isolate; /* Without isolation, the background color will be taken into account */
-                    position: relative;
-                }    
-                .zpl-inverted {
-                    mix-blend-mode: difference;
-                    
-                }    
+                .isolate { isolation: isolate; position: relative; }    
+                .zpl-inverted { mix-blend-mode: difference; }                
             </style>
         `)
 
@@ -836,7 +830,7 @@
                         }))
 
                         const paths = generateSVGPaths(pixelData, width, height, state.position.x, state.position.y, state.inverted, parameter_id)
-                        svg.push(`<g type="graphic" class="${className.join(' ')}" x="${state.position.x}" y="${state.position.y}" params="${params}">`)
+                        svg.push(`<g type="graphic" ${state.inverted ? 'class="zpl-inverted"' : ''} x="${state.position.x}" y="${state.position.y}" params="${params}">`)
                         svg.push(paths)
                         svg.push('</g>')
 
