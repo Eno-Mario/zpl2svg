@@ -207,24 +207,44 @@
         // }
 
 
-        // Use run length encoding to generate rectangles with variable width
-        let paths = ''
-        for (let i = 0; i < height; i++) {
-            let j = 0
-            while (j < width) {
-                if (bitmap[i * width + j] === 1) {
-                    let start = j
-                    while (j < width && bitmap[i * width + j] === 1) j++
-                    paths += `<rect ${inverted ? 'class="zpl-inverted"' : ''} x="${start}" y="${i}" width="${j - start}" height="1" fill="${inverted ? '#FFF' : '#000'}" />\n`
-                }
-                j++
-            }
-        }
+        // // Use run length encoding to generate rectangles with variable width
+        // let paths = ''
+        // for (let i = 0; i < height; i++) {
+        //     let j = 0
+        //     while (j < width) {
+        //         if (bitmap[i * width + j] === 1) {
+        //             let start = j
+        //             while (j < width && bitmap[i * width + j] === 1) j++
+        //             paths += `<rect ${inverted ? 'class="zpl-inverted"' : ''} x="${start}" y="${i}" width="${j - start}" height="1" fill="${inverted ? '#FFF' : '#000'}" />\n`
+        //         }
+        //         j++
+        //     }
+        // }
 
-        if (preRenderedPaths.length > 50) { // Limit the number of pre-rendered paths to 100
-            preRenderedPaths.sort((a, b) => a.serial - b.serial) // Sort by serial number ascending
-            preRenderedPaths.shift() // Remove the oldest path
+        // if (preRenderedPaths.length > 50) { // Limit the number of pre-rendered paths to 100
+        //     preRenderedPaths.sort((a, b) => a.serial - b.serial) // Sort by serial number ascending
+        //     preRenderedPaths.shift() // Remove the oldest path
+        // }
+
+        // Draw a literal bitmap on an Image and store the data URL in the path
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return ''
+        const imageData = ctx.createImageData(width, height)
+        for (let i = 0; i < bitmap.length; i++) {
+            const on = bitmap[i] === 1
+            const value = inverted ? bitmap[i] === 1 ? 255 : 0 : bitmap[i] === 1 ? 0 : 255
+            imageData.data[i * 4 + 0] = value
+            imageData.data[i * 4 + 1] = value
+            imageData.data[i * 4 + 2] = value
+            imageData.data[i * 4 + 3] = on ? 255 : 0
         }
+        ctx.putImageData(imageData, 0, 0)
+        const path = canvas.toDataURL()
+
+        const paths = `<image x="0" y="0" width="${width}" height="${height}" xlink:href="${path}" ${inverted ? 'class="zpl-inverted"' : ''} />`
 
         preRenderedPaths.push({
             serial: parameter_serial,
@@ -282,8 +302,8 @@
         ].filter(Boolean).join(' ')
 
         // Add white background
-        svg.push(`<svg class="${main_classes}" width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" style="dominant-baseline: hanging;">`)
-       
+        svg.push(`<svg class="${main_classes}" width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="dominant-baseline: hanging;">`)
+
         svg.push(`
             <style>
                 .isolate { isolation: isolate; position: relative; }    
@@ -378,7 +398,7 @@
                     break
 
                 case 'FD': { // Field Data (Text or Barcode)
-                 
+
                     state.inverted = false
                     let value = args.join(',')
                     if (state.barcode.type) {
@@ -752,10 +772,10 @@
                 case 'GF': { // Format: ^GFa,b,c,d,DATA   Example: '^FO50,50^GFA,128,128,4,C,4J0FF84I03CCE401C73F24073CDBE60C1F21E3F804EFCJ0730400FFCF0403B3360407JC0C0JFC080JF81,07IF03,03FFE06,00FF80DEI0F01FA1F80069A1FE01FB61JFDE400IF61800IFC7,01IF84,07F7FE781FFE3F0C1FE117041FE193841FC0930C0F00B318I01661,J0FE1EJ03003^FS'
 
                     // Reuse pre-rendered paths
-                    const parameter_id = args.join(',').replace(/[ \t\r\n]/g, '')
+                    const parameter_id = [state.inverted].join(',') + ',' + args.join(',').replace(/[ \t\r\n]/g, '')
                     const existing = preRenderedPaths.find(p => p.parameters === parameter_id)
                     if (existing) {
-                        svg.push(`<g type="graphic" ${state.inverted ? 'class="zpl-inverted"' : ''} transform="translate(${state.position.x}, ${state.position.y})">`)
+                        svg.push(`<g type="graphic" transform="translate(${state.position.x}, ${state.position.y})">`)
                         svg.push(existing.path)
                         svg.push('</g>')
                         break
