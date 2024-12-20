@@ -482,7 +482,7 @@
                         }
                         state.barcode.type = ''
                     } else {
-                        const text = `<text class="${className.join(' ')}" x="${state.position.x}" y="${state.position.y}" font-size="${state.font.size}" font-family="${state.font.family}" font-style="${state.font.style}" font-weight="${state.font.weight}">${value}</text>`
+                        const text = `<text class="${className.join(' ')}" x="${state.position.x}" y="${state.position.y}" font-size="${state.font.size}" font-family="${state.font.family}" font-style="${state.font.style}" font-weight="${state.font.weight}" fill="${state.fill}">${value}</text>`
                         svg.push(text)
                     }
                     state.inverted = false
