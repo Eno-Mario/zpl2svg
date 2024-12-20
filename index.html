@@ -2,6 +2,9 @@
 <html lang="en">
 
     <head>
+        <meta charset="UTF-8"> 
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description" content="Zebra Programming Language (ZPL) to Scalable Vector Graphics (SVG) converter written in vanilla JS.">
         <title>ZPL to SVG Converter</title>
         <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/bwip-js/4.5.1/bwip-js-min.js"></script>
         <link rel="stylesheet" href="./src/style.css">
@@ -25,8 +28,8 @@
             </div>
             <div class="tabs">
                 <div class="header">
-                    <button id="svg-tab" class="active">SVG</button>
-                    <button id="raw-tab">RAW</button>
+                    <button id="svg-tab" class="active" style="margin-left: 5px; border-radius: 5px 0px 0px 5px;">SVG</button>
+                    <button id="raw-tab" style="border-radius: 0px 5px 5px 0px;">RAW</button>
                     <span style="margin-left: 10px; margin-right:25px">Render time:<span id="conversion_time" style="margin-left: 10px;">/</span></span>
                     <button id="download-zpl" class="hidden">Download ZPL</button>
                     <button id="download-svg" class="hidden">Download SVG</button>
