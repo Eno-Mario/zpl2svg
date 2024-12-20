@@ -19,26 +19,27 @@
     /** @type { (input: string[], configuration: { family: string, size: number, style: string, weight: string }) => void } */
     const parseFont = (input, configuration) => {
         const [font, height, width] = input
+        const scale = 6 // Magic number to scale the font size to kinda match the real ZPL output
         switch (font) {
-            case 'A': configuration.family = "OCR-A"; configuration.size = 5; break
-            case 'B': configuration.family = "OCR-A"; configuration.size = 7; break
-            case 'C': configuration.family = "OCR-A"; configuration.size = 10; break
-            case 'D': configuration.family = "OCR-A"; configuration.size = 10; break
-            case 'E': configuration.family = "OCR-B"; configuration.size = 15; break
-            case 'F': configuration.family = "OCR-B"; configuration.size = 13; break
-            case 'G': configuration.family = "OCR-B"; configuration.size = 40; break
-            case 'H': configuration.family = "OCR-A"; configuration.size = 13; break
+            case 'A': configuration.family = "OCR-A"; configuration.size = 5 * scale; break
+            case 'B': configuration.family = "OCR-A"; configuration.size = 7 * scale; break
+            case 'C': configuration.family = "OCR-A"; configuration.size = 10 * scale; break
+            case 'D': configuration.family = "OCR-A"; configuration.size = 10 * scale; break
+            case 'E': configuration.family = "OCR-B"; configuration.size = 15 * scale; break
+            case 'F': configuration.family = "OCR-B"; configuration.size = 13 * scale; break
+            case 'G': configuration.family = "OCR-B"; configuration.size = 40 * scale; break
+            case 'H': configuration.family = "OCR-A"; configuration.size = 13 * scale; break
             case 'GS': configuration.family = "SYMBOL PROPORTIONAL"; break
             case 'O':
             // case '0': configuration.family = "Helvetica"; configuration.size = (+height * 0.5 * (scale || 1)) || configuration.size; break
             case '0': configuration.family = "ms-gothic, sans-serif"; configuration.size = +height || configuration.size; break
-            case 'P': configuration.family = "Helvetica"; configuration.size = 18; break
-            case 'Q': configuration.family = "Helvetica"; configuration.size = 24; break
-            case 'R': configuration.family = "Helvetica"; configuration.size = 31; break
-            case 'S': configuration.family = "Helvetica"; configuration.size = 35; break
-            case 'T': configuration.family = "Helvetica"; configuration.size = 42; break
-            case 'U': configuration.family = "Helvetica"; configuration.size = 53; break
-            case 'V': configuration.family = "Helvetica"; configuration.size = 71; break
+            case 'P': configuration.family = "Helvetica"; configuration.size = 18 * scale; break
+            case 'Q': configuration.family = "Helvetica"; configuration.size = 24 * scale; break
+            case 'R': configuration.family = "Helvetica"; configuration.size = 31 * scale; break
+            case 'S': configuration.family = "Helvetica"; configuration.size = 35 * scale; break
+            case 'T': configuration.family = "Helvetica"; configuration.size = 42 * scale; break
+            case 'U': configuration.family = "Helvetica"; configuration.size = 53 * scale; break
+            case 'V': configuration.family = "Helvetica"; configuration.size = 71 * scale; break
             default:
                 console.log(`Unknown font: ${font}`)
                 break
