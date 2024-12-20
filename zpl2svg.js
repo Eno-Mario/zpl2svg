@@ -115,8 +115,8 @@
     const preRenderedPaths = []
 
 
-    /** @type { (bitmap: number[], width: number, height: number, x_offset: number, y_offset: number, inverted: boolean, parameters: string) => string } */
-    const generateSVGPaths = (bitmap, width, height, x_offset, y_offset, inverted, parameters) => {
+    /** @type { (bitmap: number[], width: number, height: number, inverted: boolean, parameters: string) => string } */
+    const generateSVGPaths = (bitmap, width, height, inverted, parameters) => {
         parameter_serial++
 
         for (const path of preRenderedPaths) {
@@ -215,7 +215,7 @@
                 if (bitmap[i * width + j] === 1) {
                     let start = j
                     while (j < width && bitmap[i * width + j] === 1) j++
-                    paths += `<rect ${inverted ? 'class="zpl-inverted"' : ''} x="${start + x_offset}" y="${i + y_offset}" width="${j - start}" height="1" fill="${inverted ? '#FFF' : '#000'}" />\n`
+                    paths += `<rect ${inverted ? 'class="zpl-inverted"' : ''} x="${start}" y="${i}" width="${j - start}" height="1" fill="${inverted ? '#FFF' : '#000'}" />\n`
                 }
                 j++
             }
@@ -420,7 +420,7 @@
                             includetext: state.barcode.print_human_readable,
                             textxalign: 'center',
                             textcolor: state.stroke,
-                            color: state.stroke,
+                            barcolor: state.stroke,
                             scale: scale,
                             rotate: state.barcode.orientation === 'B' ? 'L' : state.barcode.orientation,
                         }
@@ -467,12 +467,16 @@
                                 },
                                 state.barcode
                             )))
-                            const barcode_svg = barcode.replace(/<svg viewBox="0 0 (\d+) (\d+)"/, `<svg x="${state.position.x}" y="${state.position.y}" width="${width}" style="margin: 0; padding: 0;" `)
+                            const barcode_svg = barcode.replace(/<svg viewBox="0 0 (\d+) (\d+)"/, `<g x="${state.position.x}" y="${state.position.y}" width="${width}" class="isolate" transform="translate(${state.position.x}, ${state.position.y})" params="${params}" fill="${state.fill}"`)
+                                .replace(/<\/svg>/, '</g>')
 
                             svg.push([
-                                `<g type="barcode" class="${className.join(' ')}" params="${params}">`,
+                                `<g type="barcode" class="${className.join(' ')}" params="${params}" fill="${state.fill}">`,
                                 barcode_svg.split('\n').map(line => {
                                     line = line.trim()
+                                    if (state.inverted) {
+                                        line = line.replaceAll(`stroke="#000000"`, `stroke="#FFF" class="zpl-inverted"`)
+                                    }
                                     if (!line) return ''
                                     return '  ' + line
                                 }).filter(Boolean).join('\n'),
@@ -748,10 +752,12 @@
                 case 'GF': { // Format: ^GFa,b,c,d,DATA   Example: '^FO50,50^GFA,128,128,4,C,4J0FF84I03CCE401C73F24073CDBE60C1F21E3F804EFCJ0730400FFCF0403B3360407JC0C0JFC080JF81,07IF03,03FFE06,00FF80DEI0F01FA1F80069A1FE01FB61JFDE400IF61800IFC7,01IF84,07F7FE781FFE3F0C1FE117041FE193841FC0930C0F00B318I01661,J0FE1EJ03003^FS'
 
                     // Reuse pre-rendered paths
-                    const parameter_id = [state.position.x, state.position.y].join(',') + ',' + args.join(',').replace(/[ \t\r\n]/g, '')
+                    const parameter_id = args.join(',').replace(/[ \t\r\n]/g, '')
                     const existing = preRenderedPaths.find(p => p.parameters === parameter_id)
                     if (existing) {
+                        svg.push(`<g type="graphic" ${state.inverted ? 'class="zpl-inverted"' : ''} transform="translate(${state.position.x}, ${state.position.y})">`)
                         svg.push(existing.path)
+                        svg.push('</g>')
                         break
                     }
 
@@ -820,17 +826,8 @@
                             console.log(`pixelData:`, pixelData)
                         }
 
-                        const params = encodeURI(JSON.stringify({
-                            x: state.position.x,
-                            y: state.position.y,
-                            w: width,
-                            h: height,
-                            f: state.fill,
-                            s: state.stroke,
-                        }))
-
-                        const paths = generateSVGPaths(pixelData, width, height, state.position.x, state.position.y, state.inverted, parameter_id)
-                        svg.push(`<g type="graphic" ${state.inverted ? 'class="zpl-inverted"' : ''} x="${state.position.x}" y="${state.position.y}" params="${params}">`)
+                        const paths = generateSVGPaths(pixelData, width, height, state.inverted, parameter_id)
+                        svg.push(`<g type="graphic" ${state.inverted ? 'class="zpl-inverted"' : ''} transform="translate(${state.position.x}, ${state.position.y})">`)
                         svg.push(paths)
                         svg.push('</g>')
 
