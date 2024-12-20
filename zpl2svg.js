@@ -115,8 +115,8 @@
     const preRenderedPaths = []
 
 
-    /** @type { (bitmap: number[], width: number, height: number, x_offset: number, y_offset: number, parameters: string) => string } */
-    const generateSVGPaths = (bitmap, width, height, x_offset, y_offset, parameters) => {
+    /** @type { (bitmap: number[], width: number, height: number, x_offset: number, y_offset: number, inverted: boolean, parameters: string) => string } */
+    const generateSVGPaths = (bitmap, width, height, x_offset, y_offset, inverted, parameters) => {
         parameter_serial++
 
         for (const path of preRenderedPaths) {
@@ -197,11 +197,11 @@
         //             const points = [];
         //             dfs(x, y, points);
         //             // Draw outline only
-        //             // paths += `<path d="${createPath(points)}" fill="none" stroke="black" stroke-width="0.2" />\n`;
+        //             // paths += `<path d="${createPath(points)}" fill="none" stroke="${inverted ? '#FFF' : '#000'}" stroke-width="0.2" />\n`;
         //             // Draw filled
-        //             // paths += `<path d="${createPath(points)}" fill="black" stroke="none" />\n`;
-        //             // paths += `<path d="M ${points.map(([x, y]) => `${x + x_offset} ${y + y_offset}`).join(" L ")} Z" fill="black" stroke="none" />\n`;
-        //             paths += `<path d="${createInfill(points)}" fill="black" stroke="none" />\n`;
+        //             // paths += `<path d="${createPath(points)}" fill="${inverted ? '#FFF' : '#000'}" stroke="none" />\n`;
+        //             // paths += `<path d="M ${points.map(([x, y]) => `${x + x_offset} ${y + y_offset}`).join(" L ")} Z" fill="${inverted ? '#FFF' : '#000'}" stroke="none" />\n`;
+        //             paths += `<path d="${createInfill(points)}" fill="${inverted ? '#FFF' : '#000'}" stroke="none" />\n`;
         //         }
         //     }
         // }
@@ -215,7 +215,7 @@
                 if (bitmap[i * width + j] === 1) {
                     let start = j
                     while (j < width && bitmap[i * width + j] === 1) j++
-                    paths += `<rect x="${start + x_offset}" y="${i + y_offset}" width="${j - start}" height="1" fill="black" />\n`
+                    paths += `<rect x="${start + x_offset}" y="${i + y_offset}" width="${j - start}" height="1" fill="${inverted ? '#FFF' : '#000'}" />\n`
                 }
                 j++
             }
@@ -258,8 +258,8 @@
                 x: 0,
                 y: 0,
             },
-            stroke: "black",
-            fill: "black",
+            stroke: "#000",
+            fill: "#000",
             inverted: false,
             alignment: "left",
             barcode: {
@@ -276,14 +276,30 @@
             }
         }
 
+        const main_classes = [
+            'isolate',
+            custom_class
+        ].filter(Boolean).join(' ')
+
         // Add white background
-        svg.push(`<svg ${custom_class ? `class="${custom_class}"` : ''} width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" style="dominant-baseline: hanging;">`)
-        svg.push(`<rect x="0" y="0" width="100%" height="100%" fill="white"/>`)
+        svg.push(`<svg class="${main_classes}" width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" style="dominant-baseline: hanging;">`)
+       
+        svg.push(`
+            <style>
+                .isolate {
+                    isolation: isolate; /* Without isolation, the background color will be taken into account */
+                    position: relative;
+                }    
+                .zpl-inverted {
+                    mix-blend-mode: difference;
+                    
+                }    
+            </style>
+        `)
+
+        svg.push(`<rect x="0" y="0" width="100%" height="100%" fill="#FFF"/>`)
         svg.push(`<g transform="scale(${scale}) translate(${x_offset}, ${y_offset})">`)
 
-
-        // Track inversion regions
-        let inversionMasks = []
 
         for (let i = 0; i < lines.length; i++) {
             const id = `s${svg.length}`
@@ -294,6 +310,14 @@
             // console.log(`Command: ${command} with line: ${line}`)
             const args = line.split(',')
 
+            const className = []
+            if (state.inverted) className.push('zpl-inverted')
+
+            const color = state.inverted ? '#FFF' : '#000'
+
+            state.stroke = color
+            state.fill = color
+
             switch (command) {
                 case 'XA': break // Start of label
 
@@ -302,7 +326,9 @@
 
                 case 'FX': svg.push(`<!-- ${args.join(',')} -->`); break // Comment
 
-                case 'FS': break // End of field
+                case 'FS':
+                    state.inverted = false
+                    break // End of field
 
                 case 'CF': parseFont(args, state.font); break
 
@@ -341,15 +367,15 @@
 
                     let rect
                     if (full) {
-                        rect = `<rect type="rect" x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" ${radius > 0 ? `rx="${radius}px" ry="${radius}px" stroke="${stroke}" stroke-width="1"` : ''}/>`
+                        rect = `<rect type="rect" class="${className.join(' ')}" x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" ${radius > 0 ? `rx="${radius}px" ry="${radius}px" stroke="${stroke}" stroke-width="1"` : ''}/>`
                     } else {
                         const r = radius - i / 2
-                        rect = `<rect type="rect" x="${x + i / 2}" y="${y + i / 2}" width="${w - i}" height="${h - i}" fill="none" stroke="${stroke}" stroke-width="${i}" ${r !== 0 ? `rx="${r}px" ry="${r}px"` : ''}/>`
+                        rect = `<rect type="rect" class="${className.join(' ')}" x="${x + i / 2}" y="${y + i / 2}" width="${w - i}" height="${h - i}" fill="none" stroke="${stroke}" stroke-width="${i}" ${r !== 0 ? `rx="${r}px" ry="${r}px"` : ''}/>`
                     }
 
 
                     svg.push(rect)
-
+                    state.inverted = false
                     break
                 }
 
@@ -358,6 +384,8 @@
                     break
 
                 case 'FD': { // Field Data (Text or Barcode)
+                 
+                    state.inverted = false
                     let value = args.join(',')
                     if (state.barcode.type) {
                         let bcid = ''
@@ -397,7 +425,8 @@
                             paddingright: 0,
                             includetext: state.barcode.print_human_readable,
                             textxalign: 'center',
-                            textcolor: '#000',
+                            textcolor: state.stroke,
+                            color: state.stroke,
                             scale: scale,
                             rotate: state.barcode.orientation === 'B' ? 'L' : state.barcode.orientation,
                         }
@@ -447,7 +476,7 @@
                             const barcode_svg = barcode.replace(/<svg viewBox="0 0 (\d+) (\d+)"/, `<svg x="${state.position.x}" y="${state.position.y}" width="${width}" style="margin: 0; padding: 0;" `)
 
                             svg.push([
-                                `<g type="barcode" params="${params}">`,
+                                `<g type="barcode" class="${className.join(' ')}" params="${params}">`,
                                 barcode_svg.split('\n').map(line => {
                                     line = line.trim()
                                     if (!line) return ''
@@ -459,15 +488,10 @@
                         }
                         state.barcode.type = ''
                     } else {
-                        const text = `<text x="${state.position.x}" y="${state.position.y}" font-size="${state.font.size}" font-family="${state.font.family}" font-style="${state.font.style}" font-weight="${state.font.weight}">${value}</text>`
-                        if (state.inverted) {
-                            // Add text to mask for inversion
-                            inversionMasks.push(`<text x="${state.position.x}" y="${state.position.y}" font-size="${state.font.size}" font-family="${state.font.family}" font-style="${state.font.style}" font-weight="${state.font.weight}" fill="white">${value}</text>`)
-                        } else {
-                            svg.push(text)
-                        }
+                        const text = `<text class="${className.join(' ')}" x="${state.position.x}" y="${state.position.y}" font-size="${state.font.size}" font-family="${state.font.family}" font-style="${state.font.style}" font-weight="${state.font.weight}">${value}</text>`
+                        svg.push(text)
                     }
-
+                    state.inverted = false
                     break
                 }
 
@@ -811,8 +835,8 @@
                             s: state.stroke,
                         }))
 
-                        const paths = generateSVGPaths(pixelData, width, height, state.position.x, state.position.y, parameter_id)
-                        svg.push(`<g x="${state.position.x}" y="${state.position.y}" type="graphic" params="${params}">`)
+                        const paths = generateSVGPaths(pixelData, width, height, state.position.x, state.position.y, state.inverted, parameter_id)
+                        svg.push(`<g type="graphic" class="${className.join(' ')}" x="${state.position.x}" y="${state.position.y}" params="${params}">`)
                         svg.push(paths)
                         svg.push('</g>')
 
@@ -821,7 +845,7 @@
                     } else {
                         console.log(`Unknown compression: ${compression}`)
                     }
-
+                    state.inverted = false
                     break
                 }
 
@@ -833,25 +857,8 @@
                     console.log(`Unknown command: ${command}`)
                     break
             }
-
-            if (command !== 'FR') {
-                state.inverted = false
-            }
         }
 
-        // If there are inversion masks, wrap them in an SVG mask
-        if (inversionMasks.length > 0) {
-            const maskId = `mask${Date.now()}`
-            svg.push(`<defs><mask id="${maskId}" maskUnits="userSpaceOnUse">`)
-            svg.push(`<rect x="0" y="0" width="100%" height="100%" fill="black"/>`)
-            svg.push(inversionMasks.join('\n'))
-            svg.push(`</mask></defs>`)
-
-            // Apply the mask to the entire SVG group
-            svg.push(`<g mask="url(#${maskId})">`)
-            svg.push(...svg.splice(2, svg.length - 2)) // Wrap all non-background content
-            svg.push(`</g>`)
-        }
         svg.push(`</g>`)
         svg.push(`</svg>`)
         return svg.join('\n')
