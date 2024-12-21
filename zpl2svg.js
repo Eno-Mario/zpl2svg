@@ -309,21 +309,16 @@
                     state.position.y = parseInt(args[1]);
                     break
 
-                case 'GB': { // Graphic Box
+                // Graphic Box
+                case 'GB': { // Format:  ^GBw,h,t,c,r   Example: '^GB200,200,10,B,1^FS'
                     const width = parseInt(args[0])
                     const height = parseInt(args[1])
+                    const min = Math.min(width, height)
                     const inset = parseInt(args[2]) || 0
-                    const radius = parseInt(args[3]) || 0
+                    const color = ['B', 'W'].includes(args[3]) ? args[3] === 'B' ? '#000' : '#FFF' : null // B: Black, W: White
+                    const radius = min > 0 ? constrain(parseInt(args[4]) || 0, 0, 8) / 16 * min : 0 // From 0 to 8 where the value is multiplied by 1/8 and multiplied by the shortest side of the box
                     // Draw shape with inset except when inset > width/2 or height/2 then just draw a rectangle with fill
-                    const params = encodeURI(JSON.stringify({
-                        x: state.position.x,
-                        y: state.position.y,
-                        w: width,
-                        h: height,
-                        i: inset,
-                        f: state.fill,
-                        s: state.stroke,
-                    }))
+
                     const full = width / 2 <= inset || height / 2 <= inset
 
                     const w = width
@@ -333,17 +328,16 @@
                     // Outline
                     const x = state.position.x
                     const y = state.position.y
-                    const fill = state.fill
-                    const stroke = state.stroke
+                    const fill = color || state.fill
+                    const stroke = color || state.stroke
 
                     let rect
                     if (full) {
-                        rect = `<rect type="rect" class="${className.join(' ')}" x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" ${radius > 0 ? `rx="${radius}px" ry="${radius}px" stroke="${stroke}" stroke-width="1"` : ''}/>`
+                        rect = `<rect type="rect" x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" ${radius > 0 ? `rx="${radius}px" ry="${radius}px" stroke="${stroke}" stroke-width="1"` : ''} ${inverted_body}/>`
                     } else {
-                        const r = radius - i / 2
-                        rect = `<rect type="rect" class="${className.join(' ')}" x="${x + i / 2}" y="${y + i / 2}" width="${w - i}" height="${h - i}" fill="none" stroke="${stroke}" stroke-width="${i}" ${r !== 0 ? `rx="${r}px" ry="${r}px"` : ''}/>`
+                        const r = Math.floor(radius - i / 2)
+                        rect = `<rect type="rect" x="${x + i / 2}" y="${y + i / 2}" width="${w - i}" height="${h - i}" fill="none" stroke="${stroke}" stroke-width="${i}" ${r > 0 ? `rx="${r}px" ry="${r}px"` : ''} ${inverted_body}/>`
                     }
-
 
                     svg.push(rect)
                     state.inverted = false
