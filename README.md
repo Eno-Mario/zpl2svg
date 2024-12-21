@@ -9,7 +9,9 @@ The goal is to be able to convert from ZPL to SVG and possibly vice verse.
 The conversion speed is decently fast with under 10ms from current testing. 
 There are still a lot of bugs and missing features, but it is a start.
 
-#### Requirements: bwip-js
+#### Dependencies: 
+- [bwip-js](https://www.npmjs.com/package/bwip-js) for barcode rendering
+- [canvas](https://www.npmjs.com/package/canvas) for graphic fields (only for Node.JS)
 
 ## Practical usage
 #### Browser import:

@@ -4,18 +4,43 @@
 "use strict";
 (function (root, factory) { // @ts-ignore
     if (typeof define === 'function' && define.amd) { // @ts-ignore
-        define([bwipjs], factory);
+        const getBwipJs = () => bwipjs // @ts-ignore
+        const getCanvas = () => canvas // @ts-ignore
+        define([getBwipJs, getCanvas], factory);
     } else if (typeof module === 'object' && module.exports) {
-        const bwipjs = require('bwip-js')
-        module.exports = factory(bwipjs);
-    } else { // @ts-ignore
-        root.zplToSvg = factory(bwipjs);
+        let bwipjs
+        let canvas
+        const getBwipJs = () => {
+            if (bwipjs) return bwipjs
+            try {
+                bwipjs = require('bwip-js') // @ts-ignore
+            } catch (e) {
+                console.error('zpl2svg error: bwip-js is required for barcode generation')
+                throw e
+            }
+            return bwipjs
+        }
+        const getCanvas = () => {
+            if (canvas) return canvas
+            try { // @ts-ignore
+                const { createCanvas } = require('canvas')
+                canvas = createCanvas(1024, 800); // Create canvas
+            } catch (e) {
+                console.error('zpl2svg error: canvas is required for image generation')
+                throw e
+            }
+            return canvas
+        }
+        module.exports = factory(getBwipJs, getCanvas);
+    } else {
+        const canvas = document.createElement('canvas') // @ts-ignore
+        const getBwipJs = () => bwipjs
+        const getCanvas = () => canvas
+        // @ts-ignore
+        root.zplToSvg = factory(getBwipJs, getCanvas);
     }
-}(typeof self !== 'undefined' ? self : this, function (bwipjs) {
-    if (!bwipjs) {
-        console.error('zpl2svg error: bwip-js is required for barcode generation')
-        return
-    }
+}(typeof self !== 'undefined' ? self : this, function (getBwipjs, getCanvas) {
+    
     /** @type { (input: string[], configuration: { family: string, size: number, style: string, weight: string }) => void } */
     const parseFont = (input, configuration) => {
         const [font, height, width] = input
@@ -114,6 +139,26 @@
     /** @type { { serial: number, parameters: string, path: string }[] }  */
     const preRenderedPaths = []
 
+    function generateImage({ bitmap, width, height, inverted }) {
+        const canvas = getCanvas()
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return '';
+
+        const imageData = ctx.createImageData(width, height);
+
+        for (let i = 0; i < bitmap.length; i++) {
+            const on = bitmap[i] === 1;
+            const value = inverted ? (on ? 255 : 0) : (on ? 0 : 255);
+            imageData.data[i * 4 + 0] = value; // Red channel
+            imageData.data[i * 4 + 1] = value; // Green channel
+            imageData.data[i * 4 + 2] = value; // Blue channel
+            imageData.data[i * 4 + 3] = on ? 255 : 0; // Alpha channel
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+        const path = canvas.toDataURL(); // Generate base64 image
+        return path;
+    }
 
     /** @type { (bitmap: number[], width: number, height: number, inverted: boolean, parameters: string) => string } */
     const generateSVGPaths = (bitmap, width, height, inverted, parameters) => {
@@ -125,86 +170,6 @@
                 return path.path
             }
         }
-        // // Depth first search to find connected pixels (Work in progress)
-        // const visited = new Array(bitmap.length).fill(false);
-        // const directions = [
-        //     [0, 1], [1, 0], [0, -1], [-1, 0]
-        // ];
-
-        // function isValid(x, y) {
-        //     return x >= 0 && y >= 0 && x < width && y < height;
-        // }
-
-        // function dfs(x, y, points) {
-        //     const stack = [[x, y]];
-        //     visited[y * width + x] = true;
-
-        //     while (stack.length) {
-        //         const top = stack.pop();
-        //         if (!top) break;
-        //         const [cx, cy] = top;
-        //         points.push([cx, cy]);
-
-        //         for (const [dx, dy] of directions) {
-        //             const nx = cx + dx, ny = cy + dy;
-        //             if (
-        //                 isValid(nx, ny) &&
-        //                 bitmap[ny * width + nx] === 1 &&
-        //                 !visited[ny * width + nx]
-        //             ) {
-        //                 visited[ny * width + nx] = true;
-        //                 stack.push([nx, ny]);
-        //             }
-        //         }
-        //     }
-        // }
-
-        // function createPath(points) {
-        //     const path = [];
-        //     const seen = new Set(points.map(([x, y]) => `${x},${y}`));
-
-        //     for (const [x, y] of points) {
-        //         if (!seen.has(`${x - 1},${y}`)) {
-        //             path.push(`M ${x + x_offset} ${y + y_offset} L ${x + x_offset} ${y + 1 + y_offset}`);
-        //         }
-        //         if (!seen.has(`${x + 1},${y}`)) {
-        //             path.push(`M ${x + 1 + x_offset} ${y + y_offset} L ${x + 1 + x_offset} ${y + 1 + y_offset}`);
-        //         }
-        //         if (!seen.has(`${x},${y - 1}`)) {
-        //             path.push(`M ${x + x_offset} ${y + y_offset} L ${x + 1 + x_offset} ${y + y_offset}`);
-        //         }
-        //         if (!seen.has(`${x},${y + 1}`)) {
-        //             path.push(`M ${x + x_offset} ${y + 1 + y_offset} L ${x + 1 + x_offset} ${y + 1 + y_offset}`);
-        //         }
-        //     }
-
-        //     return path.join(" ");
-        // }
-
-        // function createInfill(points) {
-        //     const path = [`M ${points[0][0] + x_offset} ${points[0][1] + y_offset}`];
-        //     for (let i = 1; i < points.length; i++) {
-        //         path.push(`L ${points[i][0] + x_offset} ${points[i][1] + y_offset}`);
-        //     }
-        //     path.push("Z");
-        //     return path.join(" ");
-        // }
-
-        // let paths = "";
-        // for (let y = 0; y < height; y++) {
-        //     for (let x = 0; x < width; x++) {
-        //         if (bitmap[y * width + x] === 1 && !visited[y * width + x]) {
-        //             const points = [];
-        //             dfs(x, y, points);
-        //             // Draw outline only
-        //             // paths += `<path d="${createPath(points)}" fill="none" stroke="${inverted ? '#FFF' : '#000'}" stroke-width="0.2" />\n`;
-        //             // Draw filled
-        //             // paths += `<path d="${createPath(points)}" fill="${inverted ? '#FFF' : '#000'}" stroke="none" />\n`;
-        //             // paths += `<path d="M ${points.map(([x, y]) => `${x + x_offset} ${y + y_offset}`).join(" L ")} Z" fill="${inverted ? '#FFF' : '#000'}" stroke="none" />\n`;
-        //             paths += `<path d="${createInfill(points)}" fill="${inverted ? '#FFF' : '#000'}" stroke="none" />\n`;
-        //         }
-        //     }
-        // }
 
 
         // // Use run length encoding to generate rectangles with variable width
@@ -227,22 +192,9 @@
         // }
 
         // Draw a literal bitmap on an Image and store the data URL in the path
-        const canvas = document.createElement('canvas')
-        canvas.width = width
-        canvas.height = height
-        const ctx = canvas.getContext('2d')
-        if (!ctx) return ''
-        const imageData = ctx.createImageData(width, height)
-        for (let i = 0; i < bitmap.length; i++) {
-            const on = bitmap[i] === 1
-            const value = inverted ? bitmap[i] === 1 ? 255 : 0 : bitmap[i] === 1 ? 0 : 255
-            imageData.data[i * 4 + 0] = value
-            imageData.data[i * 4 + 1] = value
-            imageData.data[i * 4 + 2] = value
-            imageData.data[i * 4 + 3] = on ? 255 : 0
-        }
-        ctx.putImageData(imageData, 0, 0)
-        const path = canvas.toDataURL()
+
+        const path = generateImage({ bitmap, width, height, inverted })
+        // const path = createImageBase64({ data: bitmap, width, height, fill: inverted ? 255 : 0 })
 
         const paths = `<image x="0" y="0" width="${width}" height="${height}" xlink:href="${path}" ${inverted ? 'class="zpl-inverted"' : ''} />`
 
@@ -465,6 +417,7 @@
                         // @ts-ignore
                         let barcode = ''
                         try {
+                            const bwipjs = getBwipjs()
                             barcode = bwipjs.toSVG(barcode_options)
                         } catch (e) {
                             console.log(`Failed to generate barcode: ${state.barcode.type} with value: ${value}`)
