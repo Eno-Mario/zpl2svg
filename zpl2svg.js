@@ -36,8 +36,11 @@
         const canvas = document.createElement('canvas') // @ts-ignore
         const getBwipJs = () => bwipjs
         const getCanvas = () => canvas
-        // @ts-ignore
-        root.zplToSvg = factory(getBwipJs, getCanvas);
+        const methods = factory(getBwipJs, getCanvas);
+        const keys = Object.keys(methods)
+        for (let i = 0; i < keys.length; i++) {
+            root[keys[i]] = methods[keys[i]] // Inject methods into global scope
+        }
     }
 }(typeof self !== 'undefined' ? self : this, function (getBwipjs, getCanvas) {
     
