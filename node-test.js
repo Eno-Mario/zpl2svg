@@ -1,4 +1,5 @@
-const zplToSvg = require('./zpl2svg');
+// @ts-check
+"use strict"
 
 const zpl_test_sample = `^XA
 ^FO50,50
@@ -14,6 +15,8 @@ const zpl_test_sample = `^XA
 ^XZ
 `
 
-const svg = zplToSvg(zpl_test_sample, { scale: 1, width: 1000, height: 1000 })
+const { zpl2svg } = require('./zpl2svg');
+
+const svg = zpl2svg(zpl_test_sample, { scale: 1, width: 1000, height: 1000 })
 
 console.log(svg)

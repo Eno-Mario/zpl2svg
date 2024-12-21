@@ -43,7 +43,7 @@
         }
     }
 }(typeof self !== 'undefined' ? self : this, function (getBwipjs, getCanvas) {
-    
+
     /** @type { (input: string[], configuration: { family: string, size: number, style: string, weight: string }) => void } */
     const parseFont = (input, configuration) => {
         const [font, height, width] = input
@@ -74,7 +74,6 @@
         }
     }
 
-    const seperators = [',', '!', ':']
 
     /** @type { (input: string) => (number | ',' | '!' | ':')[] } */
     const decodeRLE = input => {
@@ -97,7 +96,9 @@
         const g = cc('g')
         const z = cc('z')
 
-        const special_add = character => {
+        const seperators = [',', '!', ':']
+
+        const getRepeat = character => {
             if (!character) return 0
             const c = cc(character)
             if (c >= G && c < Z) return c - G + 1
@@ -114,17 +115,17 @@
                 continue;
             }
 
-            if (special_add(c0)) {
-                let repeat = special_add(c0)
+            if (getRepeat(c0)) {
+                let repeat = getRepeat(c0)
                 let next = char_array.shift();
-                while (special_add(next)) {
-                    repeat += special_add(next)
+                while (getRepeat(next)) {
+                    repeat += getRepeat(next)
                     next = char_array.shift();
                 }
                 push(repeat, next);
                 continue;
             }
-            if (special_add(c1)) {
+            if (getRepeat(c1)) {
                 push(1, c0);
                 continue;
             }
@@ -140,17 +141,13 @@
         });
     }
 
-    let parameter_serial = 0
-    /** @type { { serial: number, parameters: string, path: string }[] }  */
-    const preRenderedPaths = []
 
-    function generateImage({ bitmap, width, height, inverted }) {
+    /** @type { (options: { bitmap: (0 | 1)[], width: number, height: number, inverted?: boolean }) => string } */
+    const generateImageBase64 = ({ bitmap, width, height, inverted }) => {
         const canvas = getCanvas()
         const ctx = canvas.getContext('2d');
-        if (!ctx) return '';
-
+        if (!ctx) throw new Error('Failed to get 2d context')
         const imageData = ctx.createImageData(width, height);
-
         for (let i = 0; i < bitmap.length; i++) {
             const on = bitmap[i] === 1;
             const value = inverted ? (on ? 255 : 0) : (on ? 0 : 255);
@@ -159,67 +156,50 @@
             imageData.data[i * 4 + 2] = value; // Blue channel
             imageData.data[i * 4 + 3] = on ? 255 : 0; // Alpha channel
         }
-
         ctx.putImageData(imageData, 0, 0);
         const path = canvas.toDataURL(); // Generate base64 image
         return path;
     }
 
-    /** @type { (bitmap: number[], width: number, height: number, inverted: boolean, parameters: string) => string } */
-    const generateSVGPaths = (bitmap, width, height, inverted, parameters) => {
-        parameter_serial++
+    let img_id = 0
+    /** @type { { id: number, parameters: string, data: string }[] }  */
+    const image_cache = []
 
-        for (const path of preRenderedPaths) {
-            if (path.parameters === parameters) {
-                path.serial = parameter_serial
-                return path.path
+    /** @type { (bitmap: (0 | 1)[], width: number, height: number, inverted: boolean, parameters: string) => string } */
+    const drawGF = (bitmap, width, height, inverted, parameters) => {
+        img_id++
+        for (const img of image_cache) {
+            if (img.parameters === parameters) {
+                img.id = img_id
+                return img.data
             }
         }
-
-
-        // // Use run length encoding to generate rectangles with variable width
-        // let paths = ''
-        // for (let i = 0; i < height; i++) {
-        //     let j = 0
-        //     while (j < width) {
-        //         if (bitmap[i * width + j] === 1) {
-        //             let start = j
-        //             while (j < width && bitmap[i * width + j] === 1) j++
-        //             paths += `<rect ${inverted ? 'class="zpl-inverted"' : ''} x="${start}" y="${i}" width="${j - start}" height="1" fill="${inverted ? '#FFF' : '#000'}" />\n`
-        //         }
-        //         j++
-        //     }
-        // }
-
-        // if (preRenderedPaths.length > 50) { // Limit the number of pre-rendered paths to 100
-        //     preRenderedPaths.sort((a, b) => a.serial - b.serial) // Sort by serial number ascending
-        //     preRenderedPaths.shift() // Remove the oldest path
-        // }
-
-        // Draw a literal bitmap on an Image and store the data URL in the path
-
-        const path = generateImage({ bitmap, width, height, inverted })
-        // const path = createImageBase64({ data: bitmap, width, height, fill: inverted ? 255 : 0 })
-
-        const paths = `<image x="0" y="0" width="${width}" height="${height}" xlink:href="${path}" ${inverted ? 'class="zpl-inverted"' : ''} />`
-
-        preRenderedPaths.push({
-            serial: parameter_serial,
+        const base64 = generateImageBase64({ bitmap, width, height, inverted })
+        const data = `<image x="0" y="0" width="${width}" height="${height}" xlink:href="${base64}" ${inverted ? 'class="zpl-inverted"' : ''} />`
+        image_cache.push({
+            id: img_id,
             parameters,
-            path: paths
+            data
         })
-
-        return paths;
+        // Remove least used image if there are more than 10 images in the cache
+        if (image_cache.length > 10) {
+            image_cache.sort((a, b) => a.id - b.id) 
+            image_cache.shift()
+        }
+        return data
     }
 
+    /** @type { (value: number, min: number, max: number) => number } */
+    const constrain = (value, min, max) => Math.min(Math.max(value, min), max)
+
     /** @type { (zpl: string, options?: { width?: number, height?: number, scale?: number, x_offset?: number, y_offset?: number, custom_class?: string, debug?: boolean }) => string } */
-    const zplToSvg = (zpl, options) => {
+    const zpl2svg = (zpl, options) => {
         options = options || {}
         const lines = zpl.split("\n").map(line => line.split('//')[0].trim()).filter(line => line.length > 0).join('').split('^').map(line => line.trim()).filter(line => line.length > 0)
         const svg = []
         const scale = options.scale || 1
-        const width = options.width || 1200
-        const height = options.height || 800
+        const width = Math.floor(options.width || 1200)
+        const height = Math.floor(options.height || 800)
         const x_offset = options.x_offset || 0
         const y_offset = options.y_offset || 0
         const custom_class = options.custom_class || ''
@@ -254,35 +234,35 @@
         }
 
         const main_classes = [
-            'isolate',
             custom_class
         ].filter(Boolean).join(' ')
 
-        // Add white background
-        svg.push(`<svg class="${main_classes}" width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="dominant-baseline: hanging;">`)
+        // YYYY-MM-DD HH:MM:SS
+        const timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '')
 
-        svg.push(`
-            <style>
-                .isolate { isolation: isolate; position: relative; }    
-                .zpl-inverted { mix-blend-mode: difference; }                
-            </style>
-        `)
+        svg.push(`<svg class="${main_classes}" width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="background-color: #FFF; dominant-baseline: hanging; isolation: isolate; position: relative;">`)
+        // svg.push(`<rect x="0" y="0" width="100%" height="100%" fill="#FFF"/>`)
 
-        svg.push(`<rect x="0" y="0" width="100%" height="100%" fill="#FFF"/>`)
+        svg.push(`<!-- ######################################################### -->`)
+        svg.push(`<!-- ########## SVG Generated from ZPL using zpl2svg ######### -->`)
+        svg.push(`<!-- ######################################################### -->`)
+        svg.push(`<!--     Author:         Jozo132                               -->`)
+        svg.push(`<!--     Email:          jozo132@gmail.com                     -->`)
+        svg.push(`<!--     Source:         https://github.com/Jozo132/zpl2svg    -->`)
+        svg.push(`<!-- ######################################################### -->`)
+        svg.push(`<!--     Timestamp:      ${timestamp}                   -->`)
+        svg.push(`<!-- ######################################################### -->`)
+
         svg.push(`<g transform="scale(${scale}) translate(${x_offset}, ${y_offset})">`)
 
-
         for (let i = 0; i < lines.length; i++) {
-            const id = `s${svg.length}`
-
             let line = lines[i]
             const command = line.substring(0, 2).toUpperCase()
             line = line.substring(2)
             // console.log(`Command: ${command} with line: ${line}`)
             const args = line.split(',')
 
-            const className = []
-            if (state.inverted) className.push('zpl-inverted')
+            const inverted_body = state.inverted ? 'style="mix-blend-mode: difference;"' : ''
 
             const color = state.inverted ? '#FFF' : '#000'
 
@@ -290,7 +270,8 @@
             state.fill = color
 
             switch (command) {
-                case 'XA': break // Start of label
+                case 'XA': // Start of label
+                    break
 
                 case 'PR': break // Print Rate
 
@@ -439,15 +420,15 @@
                                 },
                                 state.barcode
                             )))
-                            const barcode_svg = barcode.replace(/<svg viewBox="0 0 (\d+) (\d+)"/, `<g x="${state.position.x}" y="${state.position.y}" width="${width}" class="isolate" transform="translate(${state.position.x}, ${state.position.y})" params="${params}" fill="${state.fill}"`)
+                            const barcode_svg = barcode.replace(/<svg viewBox="0 0 (\d+) (\d+)"/, `<g x="${state.position.x}" y="${state.position.y}" width="${width}" transform="translate(${state.position.x}, ${state.position.y})" params="${params}" fill="${state.fill}"`)
                                 .replace(/<\/svg>/, '</g>')
 
                             svg.push([
-                                `<g type="barcode" class="${className.join(' ')}" params="${params}" fill="${state.fill}">`,
+                                `<g type="barcode" params="${params}" fill="${state.fill}" ${inverted_body}>`,
                                 barcode_svg.split('\n').map(line => {
                                     line = line.trim()
                                     if (state.inverted) {
-                                        line = line.replaceAll(`stroke="#000000"`, `stroke="#FFF" class="zpl-inverted"`)
+                                        line = line.replaceAll(`stroke="#000000"`, `stroke="#FFF" ${inverted_body}`)
                                     }
                                     if (!line) return ''
                                     return '  ' + line
@@ -458,7 +439,7 @@
                         }
                         state.barcode.type = ''
                     } else {
-                        const text = `<text class="${className.join(' ')}" x="${state.position.x}" y="${state.position.y}" font-size="${state.font.size}" font-family="${state.font.family}" font-style="${state.font.style}" font-weight="${state.font.weight}" fill="${state.fill}">${value}</text>`
+                        const text = `<text x="${state.position.x}" y="${state.position.y}" font-size="${state.font.size}" font-family="${state.font.family}" font-style="${state.font.style}" font-weight="${state.font.weight}" fill="${state.fill}" ${inverted_body}>${value}</text>`
                         svg.push(text)
                     }
                     state.inverted = false
@@ -723,16 +704,6 @@
                 // Graphic Field
                 case 'GF': { // Format: ^GFa,b,c,d,DATA   Example: '^FO50,50^GFA,128,128,4,C,4J0FF84I03CCE401C73F24073CDBE60C1F21E3F804EFCJ0730400FFCF0403B3360407JC0C0JFC080JF81,07IF03,03FFE06,00FF80DEI0F01FA1F80069A1FE01FB61JFDE400IF61800IFC7,01IF84,07F7FE781FFE3F0C1FE117041FE193841FC0930C0F00B318I01661,J0FE1EJ03003^FS'
 
-                    // Reuse pre-rendered paths
-                    const parameter_id = [state.inverted].join(',') + ',' + args.join(',').replace(/[ \t\r\n]/g, '')
-                    const existing = preRenderedPaths.find(p => p.parameters === parameter_id)
-                    if (existing) {
-                        svg.push(`<g type="graphic" transform="translate(${state.position.x}, ${state.position.y})">`)
-                        svg.push(existing.path)
-                        svg.push('</g>')
-                        break
-                    }
-
                     /*
                         - a: compression type (A, B, C)
                         - b: binary byte count
@@ -740,10 +711,18 @@
                         - d: bytes per row
                     */
 
+                    // Reuse pre-rendered paths
+                    const parameter_id = [state.inverted].join(',') + ',' + args.join(',').replace(/[ \t\r\n]/g, '')
+                    const img = image_cache.find(p => p.parameters === parameter_id)
+                    if (img) {
+                        svg.push(`<g type="graphic" transform="translate(${state.position.x}, ${state.position.y})">`)
+                        svg.push(img.data)
+                        svg.push('</g>')
+                        break
+                    }
+
                     const [compression, binary_byte_count, graphic_field_count, bytesPerRow, ...data] = args
                     const graphic = data.join(',')
-
-
 
                     if (compression === 'A') {
                         // Check if Z64 compression is used
@@ -798,8 +777,8 @@
                             console.log(`pixelData:`, pixelData)
                         }
 
-                        const paths = generateSVGPaths(pixelData, width, height, state.inverted, parameter_id)
-                        svg.push(`<g type="graphic" ${state.inverted ? 'class="zpl-inverted"' : ''} transform="translate(${state.position.x}, ${state.position.y})">`)
+                        const paths = drawGF(pixelData, width, height, state.inverted, parameter_id)
+                        svg.push(`<g type="graphic" ${inverted_body} transform="translate(${state.position.x}, ${state.position.y})">`)
                         svg.push(paths)
                         svg.push('</g>')
 
@@ -812,12 +791,11 @@
                     break
                 }
 
-
-
-                case 'XZ': break // End of label
+                case 'XZ': // End of label
+                    break
 
                 default:
-                    console.log(`Unknown command: ${command}`)
+                    console.error(new Error(`Unknown command: ${command}`))
                     break
             }
         }
@@ -827,6 +805,11 @@
         return svg.join('\n')
     }
 
-    return zplToSvg
+    return {
+        zpl2svg,
+        decodeRLE,
+        generateImageBase64,
+        drawGF,
+    }
 
 }));

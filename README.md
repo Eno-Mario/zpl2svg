@@ -21,7 +21,7 @@ There are still a lot of bugs and missing features, but it is a start.
 ```
 #### Node.JS import:
 ```js
-const zplToSvg = require('path_to/zpl2svg.js')
+const { zpl2svg } = require('path_to/zpl2svg.js')
 ```
 
 #### Example:
@@ -34,7 +34,7 @@ const zpl_content = `
   ^FO40,100^BY2^B3N,N,100,Y,N^FD1234567^FS
   ^XZ
 `
-const svg_content = zplToSvg(zpl_content, {
+const svg_content = zpl2svg(zpl_content, {
   scale: 1,
   width: 370,
   height: 260
