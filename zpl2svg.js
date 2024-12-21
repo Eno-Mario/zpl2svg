@@ -131,7 +131,9 @@
             if (c === ',') return ','
             if (c === '!') return '!'
             if (c === ':') return ':'
-            return parseInt(c, 16)
+            const hex = parseInt(c, 16)
+            if (isNaN(hex)) return 0
+            return hex
         });
     }
 
