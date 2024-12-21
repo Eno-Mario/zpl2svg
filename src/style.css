@@ -16,16 +16,11 @@ a:hover { color: #0F5; }
 
 div.output {
     display: grid;
-    grid-template-columns: 1fr 2fr;
+    grid-template-columns: 1fr 2fr !important;
     width: 100%;
-    height: 80vh;
+    height: 80vh !important;
 }
 
-div.output>div {
-    padding: 5px;
-    margin: 0px;
-    height: 100%;
-}
 .content {
     padding: 5px;
     margin: 0px;
@@ -70,13 +65,15 @@ div.output button.active:hover {
 }
 
 
-div.output pre {
+/* div.output pre {
     height: 100%;
     background-color: #555;
     padding: 3px;
+    max-width: 60vw;
+    max-height: 70vh;
 }
 
-div.output pre textarea {
+div.output pre div, div.output pre textarea  {
     background-color: #333;
     color: #fff;
     border: none;
@@ -101,4 +98,4 @@ div.output pre textarea {
     -webkit-box-sizing: border-box;
     -moz-box-sizing: border-box;
     box-sizing: border-box;
-}
+} */

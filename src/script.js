@@ -151,8 +151,8 @@ const zpl_test_sample = `^XA
 `
 
 
-const code_element = document.getElementById("code")
-const output_element = document.getElementById("raw")
+const code_text_element = document.getElementById("code_text")
+const svg_text_element = document.getElementById("svg_text")
 const render_element = document.getElementById("svg")
 const button_svg = document.getElementById("svg-tab")
 const button_raw = document.getElementById("raw-tab")
@@ -167,9 +167,10 @@ const x_value = document.getElementById('x_value')
 const y_value = document.getElementById('y_value')
 const touch_value = document.getElementById('touch_value')
 if (!touch_value) throw new Error("Missing touch_value element")
-if (!code_element || !output_element || !render_element || !button_svg || !button_raw || !div_svg || !div_raw || !span_conversion_time || !download_zpl || !download_svg || !download_png || !zoom_value || !x_value || !y_value) {
+if (!code_text_element || !svg_text_element || !render_element || !button_svg || !button_raw || !div_svg || !div_raw || !span_conversion_time || !download_zpl || !download_svg || !download_png || !zoom_value || !x_value || !y_value) {
     throw new Error("Missing element")
 }
+
 
 /** @type {{ svg_content: string, element: Element | null, viewBox: { x: number, y: number, width: number, height: number }, viewBoxBase?: { x: number, y: number, width: number, height: number }, scale: number, x_offset: number, y_offset: number }} */
 const state = {
@@ -370,7 +371,57 @@ const update_zoom_pan = () => {
 
 update_zoom_pan()
 
-code_element.innerHTML = zpl_test_sample
+// code_element.innerHTML = zpl_test_sample
+
+// @ts-ignore
+monaco.languages.register({ id: 'zpl' });
+
+// @ts-ignore
+monaco.languages.setMonarchTokensProvider('zpl', {
+  tokenizer: {
+    root: [
+    //   [/\^\w+/, 'keyword'], // ZPL commands starting with ^
+    // ZPL commands starting with ^ and two characters after it
+      [/\^.{2}/, 'keyword'],
+      [/\,\d+/, 'number'],  // Numbers in sequences, separated by commas
+      [/\d+/, 'number'],    // Standalone numbers
+      [/I|J|K|L[0-9A-F]+!?/, 'string'], // Compact binary data patterns
+      [/!/, 'operator'],     // Exclamation operator for repetition
+    ]
+  }
+});
+
+// @ts-ignore
+monaco.editor.defineTheme('zplTheme', {
+  base: 'vs',
+  inherit: true,
+  rules: [
+    { token: 'keyword', foreground: 'ff0000', fontStyle: 'bold' },
+    { token: 'number', foreground: '0000ff' },
+    { token: 'string', foreground: '008000' },
+    { token: 'operator', foreground: 'ffa500' },
+  ]
+});
+
+// @ts-ignore
+const zpl_editor = monaco.editor.create(code_text_element, {
+    value: zpl_test_sample,
+    language: 'zpl',
+    theme: "vs-dark",
+});
+// Set the dimensions of the editor
+// @ts-ignore
+const svg_editor = monaco.editor.create(svg_text_element, {
+    value: state.svg_content,
+    language: 'xml',
+    theme: "vs-dark",
+});
+
+const update_sizes = () => {
+    zpl_editor.layout({ width: code_text_element.parentElement?.clientWidth || 0 - 10, height: code_text_element.parentElement?.clientHeight || 0 - 130 })
+    svg_editor.layout({ width: svg_text_element.parentElement?.clientWidth || 0 - 10, height: svg_text_element.parentElement?.clientHeight || 0 - 130 })
+}
+update_sizes()
 
 let timeout = null
 let refresh_count = 0
@@ -378,7 +429,8 @@ const update_svg = () => {
     refresh_count++
     clearTimeout(timeout)
     timeout = setTimeout(() => { // @ts-ignore
-        const zpl = code_element.value
+        // const zpl = code_element.value
+        const zpl = zpl_editor.getValue()
         const t = +new Date()
         const { width, height } = render_element.getBoundingClientRect()
         // @ts-ignore
@@ -386,7 +438,10 @@ const update_svg = () => {
         const render_time = +new Date() - t
         console.log("Render time:", render_time, "ms")
         span_conversion_time.innerHTML = render_time + " ms"
-        output_element.innerHTML = state.svg_content
+        // output_element.innerHTML = escped_svg
+        // w3CodeColor(output_element)
+        // @ts-ignore
+        svg_editor.setValue(state.svg_content)
         render_element.innerHTML = state.svg_content
         download_zpl.classList.remove("hidden")
         download_svg.classList.remove("hidden")
@@ -406,7 +461,13 @@ const update_svg = () => {
 setTimeout(update_svg, 50)
 
 
-code_element.addEventListener("input", update_svg)
+// code_text_element.addEventListener("input", update_svg)
+zpl_editor.onDidChangeModelContent(update_svg)
+
+// On document resize change editor sizes
+window.addEventListener("resize", () => {
+    update_sizes()
+})
 
 button_svg.addEventListener("click", (e) => {
     e?.preventDefault()
@@ -418,6 +479,7 @@ button_svg.addEventListener("click", (e) => {
 
 button_raw.addEventListener("click", (e) => {
     e?.preventDefault()
+    setTimeout(() => update_sizes(), 50)
     div_svg.classList.add("hidden")
     div_raw.classList.remove("hidden")
     button_svg.classList.remove("active")

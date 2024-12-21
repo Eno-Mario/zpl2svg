@@ -3,11 +3,7 @@
 // @ts-check
 "use strict";
 (function (root, factory) { // @ts-ignore
-    if (typeof define === 'function' && define.amd) { // @ts-ignore
-        const getBwipJs = () => bwipjs // @ts-ignore
-        const getCanvas = () => canvas // @ts-ignore
-        define([getBwipJs, getCanvas], factory);
-    } else if (typeof module === 'object' && module.exports) {
+    if (typeof module === 'object' && module.exports) {
         let bwipjs
         let canvas
         const getBwipJs = () => {
@@ -183,7 +179,7 @@
         })
         // Remove least used image if there are more than 10 images in the cache
         if (image_cache.length > 10) {
-            image_cache.sort((a, b) => a.id - b.id) 
+            image_cache.sort((a, b) => a.id - b.id)
             image_cache.shift()
         }
         return data
