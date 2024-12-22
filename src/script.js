@@ -378,48 +378,59 @@ monaco.languages.register({ id: 'zpl' });
 
 // @ts-ignore
 monaco.languages.setMonarchTokensProvider('zpl', {
-  tokenizer: {
-    root: [
-    //   [/\^\w+/, 'keyword'], // ZPL commands starting with ^
-    // ZPL commands starting with ^ and two characters after it
-      [/\^.{2}/, 'keyword'],
-      [/\,\d+/, 'number'],  // Numbers in sequences, separated by commas
-      [/\d+/, 'number'],    // Standalone numbers
-      [/I|J|K|L[0-9A-F]+!?/, 'string'], // Compact binary data patterns
-      [/!/, 'operator'],     // Exclamation operator for repetition
-    ]
-  }
+    tokenizer: {
+        root: [
+            [/(\^FX)([\s\S]*?)(?=\^|$)/, ['comment', 'comment']],
+            [/(\^FD)(.*?)(?=\^|$)/, ['keyword', 'string']],
+            [/(\^[A-Z0-9]{2})(.*?)(?=\^|$)/, ['keyword', 'number']],
+        ]
+    }
 });
 
 // @ts-ignore
 monaco.editor.defineTheme('zplTheme', {
-  base: 'vs',
-  inherit: true,
-  rules: [
-    { token: 'keyword', foreground: 'ff0000', fontStyle: 'bold' },
-    { token: 'number', foreground: '0000ff' },
-    { token: 'string', foreground: '008000' },
-    { token: 'operator', foreground: 'ffa500' },
-  ]
+    base: 'vs',
+    inherit: true,
+    rules: [
+        { token: 'comment', foreground: '008000' },
+        { token: 'string', foreground: '0000FF' },
+        { token: 'number', foreground: 'FF0000' },
+        { token: 'keyword', foreground: '0000FF' },
+    ]
 });
 
 // @ts-ignore
 const zpl_editor = monaco.editor.create(code_text_element, {
     value: zpl_test_sample,
     language: 'zpl',
-    theme: "vs-dark",
+    theme: 'zplTheme'
 });
-// Set the dimensions of the editor
+
 // @ts-ignore
 const svg_editor = monaco.editor.create(svg_text_element, {
     value: state.svg_content,
     language: 'xml',
     theme: "vs-dark",
+    // Read only
+    readOnly: true,
 });
 
 const update_sizes = () => {
-    zpl_editor.layout({ width: code_text_element.parentElement?.clientWidth || 0 - 10, height: code_text_element.parentElement?.clientHeight || 0 - 130 })
-    svg_editor.layout({ width: svg_text_element.parentElement?.clientWidth || 0 - 10, height: svg_text_element.parentElement?.clientHeight || 0 - 130 })
+    const zpl_params = {
+        width: code_text_element.parentElement?.clientWidth || 0 - 10,
+        height: code_text_element.parentElement?.clientHeight || 0 - 130
+    }
+    const svg_params = {
+        width: svg_text_element.parentElement?.clientWidth || 0 - 10,
+        height: svg_text_element.parentElement?.clientHeight || 0 - 130
+    }
+    const body_width = document.body.clientWidth
+    zpl_editor.layout(zpl_params)
+    svg_editor.layout(svg_params)
+
+    // show minimap only when body_width >= 1600
+    zpl_editor.updateOptions({ minimap: { enabled: body_width >= 1600 } })
+    svg_editor.updateOptions({ minimap: { enabled: body_width >= 1600 } })
 }
 update_sizes()
 
