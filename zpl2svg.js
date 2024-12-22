@@ -239,17 +239,17 @@
         svg.push(`<svg class="${main_classes}" width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="background-color: #FFF; dominant-baseline: hanging; isolation: isolate; position: relative;">`)
         // svg.push(`<rect x="0" y="0" width="100%" height="100%" fill="#FFF"/>`)
 
-        svg.push(`<!-- ######################################################### -->`)
-        svg.push(`<!-- ########## SVG Generated from ZPL using zpl2svg ######### -->`)
-        svg.push(`<!-- ######################################################### -->`)
-        svg.push(`<!--     Author:         Jozo132                               -->`)
-        svg.push(`<!--     Email:          jozo132@gmail.com                     -->`)
-        svg.push(`<!--     Source:         https://github.com/Jozo132/zpl2svg    -->`)
-        svg.push(`<!-- ######################################################### -->`)
-        svg.push(`<!--     Timestamp:      ${timestamp}                   -->`)
-        svg.push(`<!-- ######################################################### -->`)
+        svg.push(`  <!-- ######################################################### -->`)
+        svg.push(`  <!-- ########## SVG Generated from ZPL using zpl2svg ######### -->`)
+        svg.push(`  <!-- ######################################################### -->`)
+        svg.push(`  <!--     Author:         Jozo132                               -->`)
+        svg.push(`  <!--     Email:          jozo132@gmail.com                     -->`)
+        svg.push(`  <!--     Source:         https://github.com/Jozo132/zpl2svg    -->`)
+        svg.push(`  <!-- ######################################################### -->`)
+        svg.push(`  <!--     Timestamp:      ${timestamp}                   -->`)
+        svg.push(`  <!-- ######################################################### -->`)
 
-        svg.push(`<g transform="scale(${scale}) translate(${x_offset}, ${y_offset})">`)
+        svg.push(`  <g transform="scale(${scale}) translate(${x_offset}, ${y_offset})">`)
 
         for (let i = 0; i < lines.length; i++) {
             let line = lines[i]
@@ -272,7 +272,7 @@
                 case 'PR': break // Print Rate
 
 
-                case 'FX': svg.push(`<!-- ${args.join(',')} -->`); break // Comment
+                case 'FX': svg.push(`    <!-- ${args.join(',')} -->`); break // Comment
 
                 case 'FS':
                     state.inverted = false
@@ -310,10 +310,10 @@
 
                     let rect
                     if (full) {
-                        rect = `<rect type="rect" x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" ${radius > 0 ? `rx="${radius}px" ry="${radius}px" stroke="${stroke}" stroke-width="1"` : ''} ${inverted_body}/>`
+                        rect = `    <rect type="rect" x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" ${radius > 0 ? `rx="${radius}px" ry="${radius}px" stroke="${stroke}" stroke-width="1"` : ''} ${inverted_body}/>`
                     } else {
                         const r = Math.floor(radius - i / 2)
-                        rect = `<rect type="rect" x="${x + i / 2}" y="${y + i / 2}" width="${w - i}" height="${h - i}" fill="none" stroke="${stroke}" stroke-width="${i}" ${r > 0 ? `rx="${r}px" ry="${r}px"` : ''} ${inverted_body}/>`
+                        rect = `    <rect type="rect" x="${x + i / 2}" y="${y + i / 2}" width="${w - i}" height="${h - i}" fill="none" stroke="${stroke}" stroke-width="${i}" ${r > 0 ? `rx="${r}px" ry="${r}px"` : ''} ${inverted_body}/>`
                     }
 
                     svg.push(rect)
@@ -420,22 +420,22 @@
                                 .replace(/<\/svg>/, '</g>')
 
                             svg.push([
-                                `<g type="barcode" params="${params}" fill="${state.fill}" ${inverted_body}>`,
+                                `    <g type="barcode" params="${params}" fill="${state.fill}" ${inverted_body}>`,
                                 barcode_svg.split('\n').map(line => {
                                     line = line.trim()
                                     if (state.inverted) {
                                         line = line.replaceAll(`stroke="#000000"`, `stroke="#FFF" ${inverted_body}`)
                                     }
                                     if (!line) return ''
-                                    return '  ' + line
+                                    return '      ' + line
                                 }).filter(Boolean).join('\n'),
-                                '</g>'
+                                '    </g>'
 
                             ].join('\n'))
                         }
                         state.barcode.type = ''
                     } else {
-                        const text = `<text x="${state.position.x}" y="${state.position.y}" font-size="${state.font.size}" font-family="${state.font.family}" font-style="${state.font.style}" font-weight="${state.font.weight}" fill="${state.fill}" ${inverted_body}>${value}</text>`
+                        const text = `    <text x="${state.position.x}" y="${state.position.y}" font-size="${state.font.size}" font-family="${state.font.family}" font-style="${state.font.style}" font-weight="${state.font.weight}" fill="${state.fill}" ${inverted_body}>${value}</text>`
                         svg.push(text)
                     }
                     state.inverted = false
@@ -711,9 +711,9 @@
                     const parameter_id = [state.inverted].join(',') + ',' + args.join(',').replace(/[ \t\r\n]/g, '')
                     const img = image_cache.find(p => p.parameters === parameter_id)
                     if (img) {
-                        svg.push(`<g type="graphic" transform="translate(${state.position.x}, ${state.position.y})">`)
-                        svg.push(img.data)
-                        svg.push('</g>')
+                        svg.push(`    <g type="graphic" transform="translate(${state.position.x}, ${state.position.y})">`)
+                        svg.push('      ' + img.data)
+                        svg.push('    </g>')
                         break
                     }
 
@@ -774,9 +774,9 @@
                         }
 
                         const paths = drawGF(pixelData, width, height, state.inverted, parameter_id)
-                        svg.push(`<g type="graphic" ${inverted_body} transform="translate(${state.position.x}, ${state.position.y})">`)
-                        svg.push(paths)
-                        svg.push('</g>')
+                        svg.push(`    <g type="graphic" ${inverted_body} transform="translate(${state.position.x}, ${state.position.y})">`)
+                        svg.push('      ' + paths)
+                        svg.push('    </g>')
 
                     } else if (compression === 'B') {
 
@@ -796,7 +796,7 @@
             }
         }
 
-        svg.push(`</g>`)
+        svg.push(`  </g>`)
         svg.push(`</svg>`)
         return svg.join('\n')
     }
