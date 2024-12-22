@@ -16,9 +16,19 @@ a:hover { color: #0F5; }
 
 div.output {
     display: grid;
-    grid-template-columns: 1fr 2fr !important;
+    grid-template-columns: 1fr 2fr; /* Desktop and larger screens*/
     width: 100%;
     height: 80vh !important;
+    padding-top: 10px;
+    margin-bottom: 15px;
+}
+
+/* handle mobile devices */
+@media (max-width: 1000px) {
+    div.output {
+        grid-template-columns: 1fr !important; /* Mobile and smaller screens */
+        height: 50vh !important;
+    }
 }
 
 .content {
@@ -99,3 +109,5 @@ div.output pre div, div.output pre textarea  {
     -moz-box-sizing: border-box;
     box-sizing: border-box;
 } */
+
+.monaco-editor { position: absolute !important; }

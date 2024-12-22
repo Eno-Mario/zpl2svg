@@ -417,20 +417,23 @@ const svg_editor = monaco.editor.create(svg_text_element, {
 
 const update_sizes = () => {
     const zpl_params = {
-        width: code_text_element.parentElement?.clientWidth || 0 - 10,
-        height: code_text_element.parentElement?.clientHeight || 0 - 130
+        width: (code_text_element.parentElement?.clientWidth || 0) - 10,
+        height: (code_text_element.parentElement?.clientHeight || 0) - 10
     }
     const svg_params = {
-        width: svg_text_element.parentElement?.clientWidth || 0 - 10,
-        height: svg_text_element.parentElement?.clientHeight || 0 - 130
+        width: (svg_text_element.parentElement?.clientWidth || 0) - 10,
+        height: (svg_text_element.parentElement?.clientHeight || 0) - 10
     }
     const body_width = document.body.clientWidth
+    // zpl_editor.layout(zpl_params)
+    // svg_editor.layout(svg_params)
     zpl_editor.layout(zpl_params)
     svg_editor.layout(svg_params)
 
     // show minimap only when body_width >= 1600
     zpl_editor.updateOptions({ minimap: { enabled: body_width >= 1600 } })
     svg_editor.updateOptions({ minimap: { enabled: body_width >= 1600 } })
+
 }
 update_sizes()
 

@@ -26,7 +26,7 @@
         <link rel="stylesheet" href="./src/style.css">
     </head>
 
-    <body>
+    <body style="margin:15px">
         <div>
             <h1>Realtime ZPL to SVG Converter</h1>
             <p>Source code: <a href="https://github.com/Jozo132/zpl2svg">https://github.com/Jozo132/zpl2svg</a> - Author: Jozo132</p>
@@ -36,11 +36,11 @@
             <p id="touch_value"></p>
         </div>
         <div class="output">
-            <div style="width: 35vw !important; height: 70vh !important;">
+            <div style="width: 100% !important; height: 70vh !important;">
                 <h2 style="margin-top: 16px; margin-bottom: 8px;">ZPL Input:</h2>
                 <div id="code_text"></div>
             </div>
-            <div class="tabs" style="width: 63vw !important; height: 70vh !important;">
+            <div class="tabs" style="width: 100% !important; height: 70vh !important;">
                 <div class="header">
                     <button id="svg-tab" class="active" style="margin-left: 5px; border-radius: 5px 0px 0px 5px;">SVG</button>
                     <button id="raw-tab" style="border-radius: 0px 5px 5px 0px;">RAW</button>
@@ -50,7 +50,7 @@
                     <button id="download-png" class="hidden">Download PNG</button>
                 </div>
                 <div id="svg-div" class="content">
-                    <div id="svg" style="width: 100%; height: 90%; background-color: white;"></div>
+                    <div id="svg" style="width: 100%; height: 90%;"></div>
                 </div>
                 <div id="raw-div" class="content hidden">
                     <div id="svg_text"></div>
