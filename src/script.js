@@ -209,8 +209,8 @@ const update_mouse_pos = (e) => {
     const y = map(mouse_pos.y, 0, mouse_pos.height, state.viewBox.y, state.viewBox.y + state.viewBox.height)
 
     if (isDragging && e && e.clientX && e.clientY) {
-        const dx = e.clientX - start.x
-        const dy = e.clientY - start.y
+        const dx = (e.clientX - start.x) * 1.8
+        const dy = (e.clientY - start.y) * 1.8
         start = { x: e.clientX, y: e.clientY } // Update start position for next move
         state.viewBox.x -= dx / state.scale
         state.viewBox.y -= dy / state.scale
@@ -222,6 +222,7 @@ const update_mouse_pos = (e) => {
 }
 
 const touch_points = { valid: 0, x1: 0, y1: 0, x2: 0, y2: 0 }
+let touch_spread = 0
 
 render_element.addEventListener("mousemove", update_mouse_pos)
 render_element.addEventListener("touchmove", (e) => {
@@ -241,21 +242,20 @@ render_element.addEventListener("touchmove", (e) => {
             touch_points.y2 = e.touches[1].clientY
         } else {
             const { x1, y1, x2, y2 } = touch_points
-            const dx1 = e.touches[0].clientX - x1
-            const dy1 = e.touches[0].clientY - y1
-            const dx2 = e.touches[1].clientX - x2
-            const dy2 = e.touches[1].clientY - y2
+            const TA1 = { x: x1, y: y1 }
+            const TA2 = { x: x2, y: y2 }
+            const TB1 = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+            const TB2 = { x: e.touches[1].clientX, y: e.touches[1].clientY }
 
-            const delta = (Math.hypot(dx1, dy1) - Math.hypot(dx2, dy2)) * 0.01
+            const distA = Math.hypot(TA1.x - TA2.x, TA1.y - TA2.y)
+            const distB = Math.hypot(TB1.x - TB2.x, TB1.y - TB2.y)
+            const spread = distB - distA
+            if (touch_points.valid == 2) touch_spread = spread
 
-            touch_value.innerHTML = `(${dx1.toFixed(1)}, ${dy1.toFixed(1)}) (${dx2.toFixed(1)}, ${dy2.toFixed(1)}) ${delta.toFixed(1)}`
+            const delta = (spread - touch_spread) * 0.05
+            touch_spread = spread
 
-
-            if (!delta || !Number.isFinite(delta) || delta < -100 || delta > 100) return // Limit zoom to 0.5
-
-
-
-
+            if (Math.abs(delta) > 5) return;
             zoom_into_point(-1, -1, delta)
 
             update_zoom_pan()
