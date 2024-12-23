@@ -340,6 +340,10 @@ render_element.onmousewheel = function (e) {
     zoom_into_point(x, y, delta)
 }
 
+// @ts-ignore
+render_element.addEventListener("DOMMouseScroll", render_element.onmousewheel) // Handle Firefox mousewheel event
+
+
 render_element.addEventListener("mousedown", (e) => {
     // Only on middle mouse button or right mouse button
     if (e.button != 1 && e.button != 2) return
