@@ -321,7 +321,7 @@
                     break
                 }
 
-                case 'FR': // Field Reverse Print (DOESN'T WORK IN SVG YET) TODO: Implementaion of reverse print
+                case 'FR': // Field Reverse Print
                     state.inverted = true;
                     break
 
