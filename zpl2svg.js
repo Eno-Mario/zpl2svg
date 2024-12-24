@@ -218,7 +218,14 @@
         const custom_class = options.custom_class || ''
         const debug = options.debug || false
         const state = {
+            scanning: false,
             font: {
+                family: "Arial",
+                size: 10,
+                style: "normal",
+                weight: "normal"
+            },
+            next_font: {
                 family: "Arial",
                 size: 10,
                 style: "normal",
@@ -268,6 +275,7 @@
 
         svg.push(`  <g transform="scale(${scale}) translate(${x_offset}, ${y_offset})">`)
 
+
         for (let i = 0; i < lines.length; i++) {
             let line = lines[i].replace(/[\t\r\n]/g, '')
             const command = line.substring(0, 2).toUpperCase()
@@ -282,8 +290,29 @@
             state.stroke = color
             state.fill = color
 
+            // Match command with 'A' and any number or character
+            const next_font = state.scanning && command[0] === 'A' && command.match(/^A(\d|\w)/)
+            if (next_font) { // Format ^Af,o,h,w
+                /* 
+                    - f: font name (0-9, A-Z)
+                    - o: orientation (N, R, I, B)
+                    - h: height (1-32000)
+                    - w: width (1-32000)
+                */
+                const args = line.split(',')
+                const font = command[1]
+                const [orientation, height, width] = args
+                parseFont([font, height, width], state.next_font)
+                continue
+            }
+
+            if (!state.scanning && command !== 'XA') { // Skip all commands until ^XA is found
+                continue
+            }
+
             switch (command) {
                 case 'XA': // Start of label
+                    state.scanning = true
                     break
 
                 case 'PR': break // Print Rate
@@ -295,15 +324,31 @@
                     state.inverted = false
                     break // End of field
 
+                case 'A@': { // Use font name to call font
+                    /*
+                        Format ^A@o,h,w,d:o.x
+                        - o: orientation (N, R, I, B)
+                        - h: height (1-32000)
+                        - w: width (1-32000)
+                        - d: drive location (R:, E:, B:, A:)
+                        - o: font name
+                        - x: extension (FNT, TTF)
+                    */
+                    const args = line.split(',')
+                    const [orientation, height, width, drive, font, extension] = args
+                    parseFont([font, height, width], state.next_font)
+
+                    break
+                }
                 case 'CF': parseFont(line.split(','), state.font); break
 
                 case 'F0':
-                case 'FO': // Field Origin
+                case 'FO': { // Field Origin
                     const args = line.split(',')
                     state.position.x = parseInt(args[0]);
                     state.position.y = parseInt(args[1]);
                     break
-
+                }
                 // Graphic Box
                 case 'GB': { // Format:  ^GBw,h,t,c,r   Example: '^GB200,200,10,B,1^FS'
                     const args = line.split(',')
@@ -455,7 +500,12 @@
                         }
                         state.barcode.type = ''
                     } else {
-                        const text = `    <text x="${state.position.x}" y="${state.position.y}" font-size="${state.font.size}" font-family="${state.font.family}" font-style="${state.font.style}" font-weight="${state.font.weight}" fill="${state.fill}" ${inverted_body}>${value}</text>`
+                        const size = state.next_font.size || state.font.size
+                        const family = state.next_font.family || state.font.family
+                        const style = state.next_font.style || state.font.style
+                        const weight = state.next_font.weight || state.font.weight
+                        Object.assign(state.next_font, state.font)
+                        const text = `    <text x="${state.position.x}" y="${state.position.y}" font-size="${size}" font-family="${family}" font-style="${style}" font-weight="${weight}" fill="${state.fill}" ${inverted_body}>${value}</text>`
                         svg.push(text)
                     }
                     state.inverted = false
@@ -822,6 +872,7 @@
                 }
 
                 case 'XZ': // End of label
+                    state.scanning = false
                     break
 
                 default:
