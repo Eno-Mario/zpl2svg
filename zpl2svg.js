@@ -226,10 +226,10 @@
                 weight: "normal"
             },
             next_font: {
-                family: "Arial",
-                size: 10,
-                style: "normal",
-                weight: "normal"
+                family: "",
+                size: 0,
+                style: "",
+                weight: ""
             },
             position: {
                 x: 0,
@@ -260,7 +260,7 @@
         // YYYY-MM-DD HH:MM:SS
         const timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '')
 
-        svg.push(`<svg class="${main_classes}" width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="background-color: #FFF; dominant-baseline: hanging; isolation: isolate; position: relative;">`)
+        svg.push(`<svg class="${main_classes}" width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="background-color: #FFF;">`)
         // svg.push(`<rect x="0" y="0" width="100%" height="100%" fill="#FFF"/>`)
 
         svg.push(`  <!-- ######################################################### -->`)
@@ -273,7 +273,7 @@
         svg.push(`  <!--     Timestamp:      ${timestamp}                   -->`)
         svg.push(`  <!-- ######################################################### -->`)
 
-        svg.push(`  <g transform="scale(${scale}) translate(${x_offset}, ${y_offset})">`)
+        svg.push(`  <g transform="scale(${scale}) translate(${x_offset}, ${y_offset})" style="dominant-baseline: hanging; isolation: isolate; position: relative;">`)
 
 
         for (let i = 0; i < lines.length; i++) {
@@ -291,8 +291,8 @@
             state.fill = color
 
             // Match command with 'A' and any number or character
-            const next_font = state.scanning && command[0] === 'A' && command.match(/^A(\d|\w)/)
-            if (next_font) { // Format ^Af,o,h,w
+            const nf = state.scanning && command[0] === 'A' && command.match(/^A(\d|\w)/)
+            if (nf) { // Format ^Af,o,h,w
                 /* 
                     - f: font name (0-9, A-Z)
                     - o: orientation (N, R, I, B)
@@ -498,13 +498,21 @@
 
                             ].join('\n'))
                         }
+                        state.next_font.size = 0
+                        state.next_font.family = ''
+                        state.next_font.style = ''
+                        state.next_font.weight = ''
                         state.barcode.type = ''
                     } else {
                         const size = state.next_font.size || state.font.size
                         const family = state.next_font.family || state.font.family
                         const style = state.next_font.style || state.font.style
                         const weight = state.next_font.weight || state.font.weight
-                        Object.assign(state.next_font, state.font)
+                        state.next_font.size = 0
+                        state.next_font.family = ''
+                        state.next_font.style = ''
+                        state.next_font.weight = ''
+
                         const text = `    <text x="${state.position.x}" y="${state.position.y}" font-size="${size}" font-family="${family}" font-style="${style}" font-weight="${weight}" fill="${state.fill}" ${inverted_body}>${value}</text>`
                         svg.push(text)
                     }
