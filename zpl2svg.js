@@ -273,7 +273,7 @@
         svg.push(`  <!--     Timestamp:      ${timestamp}                   -->`)
         svg.push(`  <!-- ######################################################### -->`)
 
-        svg.push(`  <g transform="scale(${scale}) translate(${x_offset}, ${y_offset})" style="dominant-baseline: hanging; isolation: isolate; position: relative;">`)
+        svg.push(`  <g transform="scale(${scale}) translate(${x_offset}, ${y_offset})" style="isolation: isolate; position: relative;">`)
 
 
         for (let i = 0; i < lines.length; i++) {
@@ -513,7 +513,7 @@
                         state.next_font.style = ''
                         state.next_font.weight = ''
 
-                        const text = `    <text x="${state.position.x}" y="${state.position.y}" font-size="${size}" font-family="${family}" font-style="${style}" font-weight="${weight}" fill="${state.fill}" ${inverted_body}>${value}</text>`
+                        const text = `    <text x="${state.position.x}" y="${state.position.y}" dy="0.75em" font-size="${size}" font-family="${family}" font-style="${style}" font-weight="${weight}" fill="${state.fill}" ${inverted_body}>${value}</text>`
                         svg.push(text)
                     }
                     state.inverted = false
