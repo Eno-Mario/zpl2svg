@@ -416,7 +416,7 @@
                             //     },
                             //     state.barcode
                             // )))
-                            const barcode_svg = barcode.replace(/<svg viewBox="0 0 (\d+) (\d+)"/, `<g x="${state.position.x}" y="${state.position.y}" width="${width}" transform="translate(${state.position.x}, ${state.position.y})"fill="${state.fill}"`)
+                            const barcode_svg = barcode.replace(/<svg viewBox="0 0 (\d+) (\d+)"/, `<g x="${state.position.x}" y="${state.position.y}" width="${width}" transform="translate(${state.position.x}, ${state.position.y})" fill="${state.fill}"`)
                                 .replace(/<\/svg>/, '</g>')
                                 .replace(' xmlns="http://www.w3.org/2000/svg"', '')
                             svg.push([
