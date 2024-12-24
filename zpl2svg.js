@@ -407,20 +407,20 @@
                         const viewBox = barcode.match(/viewBox="0 0 (\d+) (\d+)"/)
                         if (viewBox) {
                             const [, width, height] = viewBox
-                            // const barcode_svg = barcode.replace(/<svg/, `<svg x="${state.position.x}" y="${state.position.y}" width="${width}"`)
-                            // replace svg with viewbox
-                            const params = encodeURI(JSON.stringify(Object.assign(
-                                {
-                                    x: state.position.x,
-                                    y: state.position.y,
-                                },
-                                state.barcode
-                            )))
-                            const barcode_svg = barcode.replace(/<svg viewBox="0 0 (\d+) (\d+)"/, `<g x="${state.position.x}" y="${state.position.y}" width="${width}" transform="translate(${state.position.x}, ${state.position.y})" params="${params}" fill="${state.fill}"`)
+                            //// const barcode_svg = barcode.replace(/<svg/, `<svg x="${state.position.x}" y="${state.position.y}" width="${width}"`)
+                            //// replace svg with viewbox
+                            // const params = encodeURI(JSON.stringify(Object.assign(
+                            //     {
+                            //         x: state.position.x,
+                            //         y: state.position.y,
+                            //     },
+                            //     state.barcode
+                            // )))
+                            const barcode_svg = barcode.replace(/<svg viewBox="0 0 (\d+) (\d+)"/, `<g x="${state.position.x}" y="${state.position.y}" width="${width}" transform="translate(${state.position.x}, ${state.position.y})"fill="${state.fill}"`)
                                 .replace(/<\/svg>/, '</g>')
-
+                                .replace(' xmlns="http://www.w3.org/2000/svg"', '')
                             svg.push([
-                                `    <g type="barcode" params="${params}" fill="${state.fill}" ${inverted_body}>`,
+                                `    <g type="barcode" fill="${state.fill}" ${inverted_body}>`,
                                 barcode_svg.split('\n').map(line => {
                                     line = line.trim()
                                     if (state.inverted) {
