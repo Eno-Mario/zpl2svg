@@ -6,6 +6,7 @@
     if (typeof module === 'object' && module.exports) {
         let bwipjs
         let canvas
+        let imageLoader
         const getBwipJs = () => {
             if (bwipjs) return bwipjs
             try {
@@ -19,26 +20,42 @@
         const getCanvas = () => {
             if (canvas) return canvas
             try { // @ts-ignore
-                const { createCanvas } = require('canvas')
+                const { createCanvas, loadImage } = require('canvas')
                 canvas = createCanvas(1024, 800); // Create canvas
+                imageLoader = loadImage
             } catch (e) {
                 console.error('zpl2svg error: canvas is required for image generation')
                 throw e
             }
             return canvas
         }
-        module.exports = factory(getBwipJs, getCanvas);
+        const getImageLoader = () => {
+            if (imageLoader) return imageLoader
+            getCanvas()
+            return imageLoader
+        }
+        module.exports = factory(getBwipJs, getCanvas, getImageLoader);
     } else {
         const canvas = document.createElement('canvas') // @ts-ignore
         const getBwipJs = () => bwipjs
         const getCanvas = () => canvas
-        const methods = factory(getBwipJs, getCanvas);
+        const imageLoader = src => new Promise((resolve, reject) => {
+            const img = new Image()
+            img.onload = () => {
+                resolve(img)
+                URL.revokeObjectURL(img.src)
+            }
+            img.onerror = reject
+            img.src = src
+        })
+        const getImageLoader = () => imageLoader
+        const methods = factory(getBwipJs, getCanvas, getImageLoader);
         const keys = Object.keys(methods)
         for (let i = 0; i < keys.length; i++) {
             root[keys[i]] = methods[keys[i]] // Inject methods into global scope
         }
     }
-}(typeof self !== 'undefined' ? self : this, function (getBwipjs, getCanvas) {
+}(typeof self !== 'undefined' ? self : this, function (getBwipjs, getCanvas, getImageLoader) {
 
     /** @type { (input: string[], configuration: { family: string, size: number, style: string, weight: string }) => void } */
     const parseFont = (input, configuration) => {
@@ -252,11 +269,11 @@
         svg.push(`  <g transform="scale(${scale}) translate(${x_offset}, ${y_offset})">`)
 
         for (let i = 0; i < lines.length; i++) {
-            let line = lines[i]
+            let line = lines[i].replace(/[\t\r\n]/g, '')
             const command = line.substring(0, 2).toUpperCase()
             line = line.substring(2)
             // console.log(`Command: ${command} with line: ${line}`)
-            const args = line.split(',')
+
 
             const inverted_body = state.inverted ? 'style="mix-blend-mode: difference;"' : ''
 
@@ -272,22 +289,24 @@
                 case 'PR': break // Print Rate
 
 
-                case 'FX': svg.push(`    <!-- ${args.join(',')} -->`); break // Comment
+                case 'FX': svg.push(`    <!-- ${line} -->`); break // Comment
 
                 case 'FS':
                     state.inverted = false
                     break // End of field
 
-                case 'CF': parseFont(args, state.font); break
+                case 'CF': parseFont(line.split(','), state.font); break
 
                 case 'F0':
                 case 'FO': // Field Origin
+                    const args = line.split(',')
                     state.position.x = parseInt(args[0]);
                     state.position.y = parseInt(args[1]);
                     break
 
                 // Graphic Box
                 case 'GB': { // Format:  ^GBw,h,t,c,r   Example: '^GB200,200,10,B,1^FS'
+                    const args = line.split(',')
                     const width = parseInt(args[0])
                     const height = parseInt(args[1])
                     const min = Math.min(width, height)
@@ -327,6 +346,7 @@
 
                 case 'FD': { // Field Data (Text or Barcode)
 
+                    const args = line.split(',')
                     state.inverted = false
                     let value = args.join(',')
                     if (state.barcode.type) {
@@ -444,6 +464,7 @@
 
 
                 case 'BY': { // Barcode Field Default Parameters
+                    const args = line.split(',')
                     state.barcode.barscale = parseInt(args[0]) || state.barcode.barscale
                     // state.barcode.ratio = parseInt(args[1]) || state.barcode.ratio
                     state.barcode.width = parseInt(args[1]) || state.barcode.width
@@ -470,6 +491,7 @@
                         - f: number of symbols (0-26) default: 1
                         - g: optional ID field (24 characters max) default: <empty>  
                     */
+                    const args = line.split(',')
                     state.barcode.type = command
                     state.barcode.orientation = args[0] || state.barcode.orientation
                     state.barcode.magnification = parseInt(args[1]) || 1
@@ -492,6 +514,7 @@
                             - print human readable: Y, N
                             - print above: Y, N
                     */
+                    const args = line.split(',')
                     state.barcode.orientation = args[0] || state.barcode.orientation
                     state.barcode.check = args[1] ? args[1] === 'Y' : false
                     state.barcode.height = parseInt(args[2]) || state.barcode.default_height
@@ -512,6 +535,7 @@
                             - check digit: Y, N
                             - narrow bar width: 2, 3, 4, 5, 6, 7, 8, 9
                     */
+                    const args = line.split(',')
                     state.barcode.orientation = args[0] || state.barcode.orientation
                     state.barcode.height = parseInt(args[1]) || state.barcode.default_height
                     state.barcode.print_human_readable = args[2] ? args[2] === 'Y' : true
@@ -532,6 +556,7 @@
                         - print human readable: Y, N
                         - print above: Y, N
                     */
+                    const args = line.split(',')
                     state.barcode.orientation = args[0] || state.barcode.orientation
                     state.barcode.check = args[1] ? args[1] === 'Y' : false
                     state.barcode.height = parseInt(args[2]) || state.barcode.default_height
@@ -550,6 +575,7 @@
                         - print human readable: Y, N
                         - mode: 0, 1, 2, 3, 4, 5, A    default: A
                     */
+                    const args = line.split(',')
                     state.barcode.orientation = args[0] || state.barcode.orientation
                     state.barcode.height = parseInt(args[1]) || state.barcode.default_height
                     state.barcode.print_human_readable = args[2] ? args[2] === 'Y' : true
@@ -567,6 +593,7 @@
                         - print human readable: Y, N
                         - print above: Y, N
                     */
+                    const args = line.split(',')
                     state.barcode.orientation = args[0] || state.barcode.orientation
                     state.barcode.height = parseInt(args[1]) || state.barcode.default_height
                     state.barcode.print_human_readable = args[2] ? args[2] === 'Y' : false
@@ -586,6 +613,7 @@
                         - rows: 3-90
                         - truncated: Y, N
                     */
+                    const args = line.split(',')
                     state.barcode.orientation = args[0] || state.barcode.orientation
                     state.barcode.height = parseInt(args[1]) || state.barcode.default_height
                     state.barcode.security_level = parseInt(args[2]) || 0
@@ -605,6 +633,7 @@
                         - print human readable: Y, N
                         - print above: Y, N
                     */
+                    const args = line.split(',')
                     state.barcode.orientation = args[0] || state.barcode.orientation
                     state.barcode.height = parseInt(args[1]) || state.barcode.default_height
                     state.barcode.print_human_readable = args[2] ? args[2] === 'Y' : true
@@ -623,6 +652,7 @@
                         - print above: Y, N
                         - check digit: Y, N
                     */
+                    const args = line.split(',')
                     state.barcode.orientation = args[0] || state.barcode.orientation
                     state.barcode.height = parseInt(args[1]) || state.barcode.default_height
                     state.barcode.print_human_readable = args[2] ? args[2] === 'Y' : true
@@ -642,6 +672,7 @@
                         - print above: Y, N
                         - check digit: Y, N
                     */
+                    const args = line.split(',')
                     state.barcode.orientation = args[0] || state.barcode.orientation
                     state.barcode.height = parseInt(args[1]) || state.barcode.default_height
                     state.barcode.print_human_readable = args[2] ? args[2] === 'Y' : true
@@ -662,6 +693,7 @@
                         - rows: 3-90
                         - mode: N, R, I, B
                     */
+                    const args = line.split(',')
                     state.barcode.orientation = args[0] || state.barcode.orientation
                     state.barcode.height = parseInt(args[1]) || state.barcode.default_height
                     state.barcode.security_level = parseInt(args[2]) || 0
@@ -687,6 +719,7 @@
                             - A: Auto mode
                             - D: UCC/EAN Application Identifier mode
                     */
+                    const args = line.split(',')
                     state.barcode.orientation = args[0] || state.barcode.orientation
                     state.barcode.height = parseInt(args[1]) || state.barcode.default_height
                     state.barcode.print_human_readable = args[2] ? args[2] === 'Y' : true
@@ -708,7 +741,7 @@
                     */
 
                     // Reuse pre-rendered paths
-                    const parameter_id = [state.inverted].join(',') + ',' + args.join(',').replace(/[ \t\r\n]/g, '')
+                    const parameter_id = [state.inverted].join(',') + ',' + line
                     const img = image_cache.find(p => p.parameters === parameter_id)
                     if (img) {
                         svg.push(`    <g type="graphic" transform="translate(${state.position.x}, ${state.position.y})">`)
@@ -717,6 +750,7 @@
                         break
                     }
 
+                    const args = line.split(',')
                     const [compression, binary_byte_count, graphic_field_count, bytesPerRow, ...data] = args
                     const graphic = data.join(',')
 
@@ -801,8 +835,29 @@
         return svg.join('\n')
     }
 
+    // Use Image for browser and Canvas for Node.js
+    const svg2png = async (svg, options) => {
+        const canvas = getCanvas() // Gets a new canvas element from browser or node-canvas from Node.js
+        const imageLoader = getImageLoader() // Gets a new Image element from browser or node-canvas from Node.js
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('Failed to get 2d context')
+        const image = await imageLoader(`data:image/svg+xml;base64,${btoa(svg)}`)
+        canvas.width = image.width
+        canvas.height = image.height
+        ctx.drawImage(image, 0, 0)
+        const png = canvas.toDataURL('image/png')
+        return png
+    }
+
+    const zpl2png = async (zpl, options) => {
+        const svg = zpl2svg(zpl, options)
+        return await svg2png(svg, options)
+    }
+
     return {
         zpl2svg,
+        svg2png,
+        zpl2png,
         decodeRLE,
         generateImageBase64,
         drawGF,

@@ -535,64 +535,34 @@ download_svg.addEventListener("click", (e) => {
 
 
 let export_png_active = false
-function export_png(filename, svg) {
+async function export_png(filename, svg) {
     if (export_png_active) return;
     export_png_active = true;
     setTimeout(() => export_png_active = false, 5000);
-    // Create a Blob from the SVG string
-    // Handle isTrusted error
-    if (!svg) {
-        export_png_active = false;
-        console.error("No SVG content to export.");
-        return;
-    }
-    // The svg can include embedded images, which can be loaded as data URLs and therefore can trigger a security warning.
-    // To avoid this, we can use a Blob URL to load the SVG image into an Image object.
-    const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(svgBlob);
-    const temp_canvas = document.createElement('canvas');
-    const img = new Image();
-    img.onload = function () {
-        // Ensure canvas matches the SVG dimensions
-        temp_canvas.width = img.width;
-        temp_canvas.height = img.height;
+    try {
 
-        // Draw the image onto the canvas
-        const ctx = temp_canvas.getContext('2d');
-        if (!ctx) {
+        // Create a Blob from the SVG string
+        // Handle isTrusted error
+        if (!svg) {
             export_png_active = false;
-            console.error("Failed to get 2D context for canvas.");
-            URL.revokeObjectURL(url);
+            console.error("No SVG content to export.");
             return;
         }
-        ctx.clearRect(0, 0, temp_canvas.width, temp_canvas.height);
-        ctx.drawImage(img, 0, 0);
-
-        // Convert canvas to PNG data URL
-        const pngDataUrl = temp_canvas.toDataURL('image/png');
-
+        // @ts-ignore
+        const png_base64 = await svg2png(svg)
         // Properly trigger a file download
         const a = document.createElement('a');
-        a.href = pngDataUrl;
+        a.href = png_base64;
         a.download = filename;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
+    } catch (error) {
+        console.error(error);
+    }
 
-        export_png_active = false;
+    export_png_active = false;
 
-        // Revoke the object URL
-        URL.revokeObjectURL(url);
-    };
-
-    img.onerror = function (e) {
-        export_png_active = false;
-        console.error(`Failed to load SVG for conversion. Error: ${JSON.stringify(e)}`);
-        URL.revokeObjectURL(url);
-    };
-
-    // Start loading the image
-    img.src = url;
 }
 
 download_png.addEventListener("click", () => export_png("label.png", state.svg_content))
