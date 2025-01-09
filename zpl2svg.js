@@ -260,7 +260,7 @@
         // YYYY-MM-DD HH:MM:SS
         const timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '')
 
-        svg.push(`<svg class="${main_classes}" width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="background-color: #FFF;">`)
+        svg.push(`<svg class="${main_classes}" width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="background-color: #FFF; isolation: isolate; position: relative;">`)
         // svg.push(`<rect x="0" y="0" width="100%" height="100%" fill="#FFF"/>`)
 
         svg.push(`  <!-- ######################################################### -->`)
@@ -273,7 +273,7 @@
         svg.push(`  <!--     Timestamp:      ${timestamp}                   -->`)
         svg.push(`  <!-- ######################################################### -->`)
 
-        svg.push(`  <g transform="scale(${scale}) translate(${x_offset}, ${y_offset})" style="isolation: isolate; position: relative;">`)
+        svg.push(`  <g transform="scale(${scale}) translate(${x_offset}, ${y_offset})">`)
 
 
         for (let i = 0; i < lines.length; i++) {
@@ -900,7 +900,9 @@
         const imageLoader = getImageLoader() // Gets a new Image element from browser or node-canvas from Node.js
         const ctx = canvas.getContext('2d');
         if (!ctx) throw new Error('Failed to get 2d context')
-        const image = await imageLoader(`data:image/svg+xml;base64,${btoa(svg)}`)
+        const svg_base64 = `data:image/svg+xml;base64,${btoa(svg)}`
+        // console.log(`svg_base64:`, svg_base64)
+        const image = await imageLoader(svg_base64)
         canvas.width = image.width
         canvas.height = image.height
         ctx.drawImage(image, 0, 0)
