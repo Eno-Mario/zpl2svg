@@ -360,11 +360,14 @@
                     const radius = min > 0 ? constrain(parseInt(args[4]) || 0, 0, 8) / 16 * min : 0 // From 0 to 8 where the value is multiplied by 1/8 and multiplied by the shortest side of the box
                     // Draw shape with inset except when inset > width/2 or height/2 then just draw a rectangle with fill
 
+                    if (inset == 0) break
+
                     const full = width / 2 <= inset || height / 2 <= inset
 
                     const w = width
                     const h = height
                     const i = inset
+                    const r = radius
 
                     // Outline
                     const x = state.position.x
@@ -374,10 +377,58 @@
 
                     let rect
                     if (full) {
-                        rect = `    <rect type="rect" x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" ${radius > 0 ? `rx="${radius}px" ry="${radius}px" stroke="${stroke}" stroke-width="1"` : ''} ${inverted_body}/>`
+                        rect = `    <rect type="rect" x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" ${r > 0 ? `rx="${r}px" ry="${r}px"` : ''} ${inverted_body}/>`
                     } else {
-                        const r = Math.floor(radius - i / 2)
-                        rect = `    <rect type="rect" x="${x + i / 2}" y="${y + i / 2}" width="${w - i}" height="${h - i}" fill="none" stroke="${stroke}" stroke-width="${i}" ${r > 0 ? `rx="${r}px" ry="${r}px"` : ''} ${inverted_body}/>`
+                        if (r > 0) {
+                            const path = [
+                                // Outer rectangle with rounded corners
+                                `M ${x + r} ${y}`,
+                                `h ${w - 2 * r}`,
+                                `a ${r} ${r} 0 0 1 ${r} ${r}`,
+                                `v ${h - 2 * r}`,
+                                `a ${r} ${r} 0 0 1 -${r} ${r}`,
+                                `h ${-w + 2 * r}`,
+                                `a ${r} ${r} 0 0 1 -${r} -${r}`,
+                                `v ${-h + 2 * r}`,
+                                `a ${r} ${r} 0 0 1 ${r} -${r}`,
+                                `z`
+                            ]
+
+                            const xi = x + i
+                            const yi = y + i
+                            const wi = w - 2 * i
+                            const hi = h - 2 * i
+                            const ri = r - i
+
+                            if (ri <= 0) {
+                                // Inner rectangle without rounded corners
+                                path.push(...[
+                                    `M ${xi} ${yi}`,
+                                    `h ${wi}`,
+                                    `v ${hi}`,
+                                    `h ${-wi}`,
+                                    `v ${-hi}`,
+                                    `z`
+                                ])
+                            } else {
+                                // Inner rectangle with rounded corners
+                                path.push(...[
+                                    `M ${xi + ri} ${yi}`,
+                                    `h ${wi - 2 * ri}`,
+                                    `a ${ri} ${ri} 0 0 1 ${ri} ${ri}`,
+                                    `v ${hi - 2 * ri}`,
+                                    `a ${ri} ${ri} 0 0 1 -${ri} ${ri}`,
+                                    `h ${-wi + 2 * ri}`,
+                                    `a ${ri} ${ri} 0 0 1 -${ri} -${ri}`,
+                                    `v ${-hi + 2 * ri}`,
+                                    `a ${ri} ${ri} 0 0 1 ${ri} -${ri}`,
+                                    `z`
+                                ])
+                            }
+                            rect = `    <path type="rect" d="${path.join(' ')}" fill="${stroke}" stroke="none" fill-rule="evenodd" ${inverted_body}/>`
+                        } else {
+                            rect = `    <rect type="rect" x="${x + i / 2}" y="${y + i / 2}" width="${w - i}" height="${h - i}" fill="none" stroke="${stroke}" stroke-width="${i}" ${inverted_body}/>`
+                        }
                     }
 
                     svg.push(rect)
