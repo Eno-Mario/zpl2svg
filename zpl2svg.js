@@ -205,18 +205,17 @@
     /** @type { (value: number, min: number, max: number) => number } */
     const constrain = (value, min, max) => Math.min(Math.max(value, min), max)
 
-    /** @type { (zpl: string, options?: { width?: number, height?: number, scale?: number, x_offset?: number, y_offset?: number, custom_class?: string, debug?: boolean }) => string } */
+    /** @type { (zpl: string, options?: { width?: number, height?: number, scale?: number, x_offset?: number, y_offset?: number, custom_class?: string, debug?: boolean, dynamic_size?: boolean }) => string } */
     const zpl2svg = (zpl, options) => {
         options = options || {}
         const lines = zpl.split("\n").map(line => line.split('//')[0].trim()).filter(line => line.length > 0).join('').split('^').map(line => line.trim()).filter(line => line.length > 0)
         const svg = []
         const scale = options.scale || 1
-        const width = Math.floor(options.width || 1200)
-        const height = Math.floor(options.height || 800)
         const x_offset = options.x_offset || 0
         const y_offset = options.y_offset || 0
         const custom_class = options.custom_class || ''
         const debug = options.debug || false
+        const dynamic_size = typeof options.dynamic_size != 'undefined' ? !!options.dynamic_size : true
         const state = {
             scanning: false,
             font: {
@@ -235,6 +234,10 @@
                 x: 0,
                 y: 0,
             },
+            label_home_x: 0,
+            label_home_y: 0,
+            label_width: 0,
+            label_height: 0,
             stroke: "#000",
             fill: "#000",
             inverted: false,
@@ -260,8 +263,7 @@
         // YYYY-MM-DD HH:MM:SS
         const timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '')
 
-        svg.push(`<svg class="${main_classes}" width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="background-color: #FFF; isolation: isolate; position: relative;">`)
-        // svg.push(`<rect x="0" y="0" width="100%" height="100%" fill="#FFF"/>`)
+        // Head will be added to the SVG at the end when the dynamic size is read out if enabled
 
         svg.push(`  <!-- ######################################################### -->`)
         svg.push(`  <!-- ########## SVG Generated from ZPL using zpl2svg ######### -->`)
@@ -342,6 +344,23 @@
                 }
                 case 'CF': parseFont(line.split(','), state.font); break
 
+                case 'PW': { // Print Width
+                    const args = line.split(',')
+                    state.label_width = args[0] ? parseInt(args[0]) || 0 : state.label_width
+                    break
+                }
+                case 'LL': { // Label Length
+                    const args = line.split(',')
+                    state.label_height = args[0] ? parseInt(args[0]) || 0 : state.label_height
+                    break
+                }
+                case 'LH': { // Label Home
+                    const args = line.split(',')
+                    state.label_home_x = args[0] ? parseInt(args[0]) || 0 : state.label_home_x
+                    state.label_home_y = args[1] ? parseInt(args[1]) || 0 : state.label_home_y
+                    break
+                }
+
                 case 'F0':
                 case 'FO': { // Field Origin
                     const args = line.split(',')
@@ -370,8 +389,8 @@
                     const r = radius
 
                     // Outline
-                    const x = state.position.x
-                    const y = state.position.y
+                    const x = state.position.x + state.label_home_x
+                    const y = state.position.y + state.label_home_y
                     const fill = color || state.fill
                     const stroke = color || state.stroke
 
@@ -523,16 +542,18 @@
                         const viewBox = barcode.match(/viewBox="0 0 (\d+) (\d+)"/)
                         if (viewBox) {
                             const [, width, height] = viewBox
-                            //// const barcode_svg = barcode.replace(/<svg/, `<svg x="${state.position.x}" y="${state.position.y}" width="${width}"`)
+                            const x = state.position.x + state.label_home_x
+                            const y = state.position.y + state.label_home_y
+                            //// const barcode_svg = barcode.replace(/<svg/, `<svg x="${x}" y="${y}" width="${width}"`)
                             //// replace svg with viewbox
                             // const params = encodeURI(JSON.stringify(Object.assign(
                             //     {
-                            //         x: state.position.x,
-                            //         y: state.position.y,
+                            //         x: state.position.x + state.label_home_x,
+                            //         y: state.position.y + state.label_home_y,
                             //     },
                             //     state.barcode
                             // )))
-                            const barcode_svg = barcode.replace(/<svg viewBox="0 0 (\d+) (\d+)"/, `<g x="${state.position.x}" y="${state.position.y}" width="${width}" transform="translate(${state.position.x}, ${state.position.y})" fill="${state.fill}"`)
+                            const barcode_svg = barcode.replace(/<svg viewBox="0 0 (\d+) (\d+)"/, `<g x="${x}" y="${y}" width="${width}" transform="translate(${x}, ${y})" fill="${state.fill}"`)
                                 .replace(/<\/svg>/, '</g>')
                                 .replace(' xmlns="http://www.w3.org/2000/svg"', '')
                             svg.push([
@@ -563,8 +584,9 @@
                         state.next_font.family = ''
                         state.next_font.style = ''
                         state.next_font.weight = ''
-
-                        const text = `    <text x="${state.position.x}" y="${state.position.y}" dy="0.75em" font-size="${size}" font-family="${family}" font-style="${style}" font-weight="${weight}" fill="${state.fill}" ${inverted_body}>${value}</text>`
+                        const x = state.position.x + state.label_home_x
+                        const y = state.position.y + state.label_home_y
+                        const text = `    <text x="${x}" y="${y}" dy="0.75em" font-size="${size}" font-family="${family}" font-style="${style}" font-weight="${weight}" fill="${state.fill}" ${inverted_body}>${value}</text>`
                         svg.push(text)
                     }
                     state.inverted = false
@@ -852,8 +874,10 @@
                     // Reuse pre-rendered paths
                     const parameter_id = [state.inverted].join(',') + ',' + line
                     const img = image_cache.find(p => p.parameters === parameter_id)
+                    const x = state.position.x + state.label_home_x
+                    const y = state.position.y + state.label_home_y
                     if (img) {
-                        svg.push(`    <g type="graphic" transform="translate(${state.position.x}, ${state.position.y})">`)
+                        svg.push(`    <g type="graphic" transform="translate(${x}, ${y})">`)
                         svg.push('      ' + img.data)
                         svg.push('    </g>')
                         break
@@ -917,7 +941,7 @@
                         }
 
                         const paths = drawGF(pixelData, width, height, state.inverted, parameter_id)
-                        svg.push(`    <g type="graphic" ${inverted_body} transform="translate(${state.position.x}, ${state.position.y})">`)
+                        svg.push(`    <g type="graphic" ${inverted_body} transform="translate(${x}, ${y})">`)
                         svg.push('      ' + paths)
                         svg.push('    </g>')
 
@@ -939,9 +963,14 @@
                     break
             }
         }
-
         svg.push(`  </g>`)
         svg.push(`</svg>`)
+
+        const width = Math.floor((dynamic_size ? state.label_width || options.width : options.width) || 1200)
+        const height = Math.floor((dynamic_size ? state.label_height || options.height : options.height) || 800)
+
+        svg.unshift(`<svg class="${main_classes}" width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="background-color: #FFF; isolation: isolate; position: relative;">`)
+
         return svg.join('\n')
     }
 
