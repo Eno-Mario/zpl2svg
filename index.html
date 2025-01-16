@@ -9,6 +9,9 @@
 
         <!-- import bwip-js for barcode rendering -->
         <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/bwip-js/4.5.1/bwip-js-min.js"></script>
+        <!-- import pako for Z64 encoding and decoding -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+
 
         <link rel="stylesheet" data-name="vs/editor/editor.main" href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.26.1/min/vs/editor/editor.main.min.css">
         <script>
@@ -31,7 +34,7 @@
             <h1>Realtime ZPL to SVG Converter</h1>
             <p>Source code: <a href="https://github.com/Jozo132/zpl2svg">https://github.com/Jozo132/zpl2svg</a> - Author: Jozo132</p>
             <h3 style="margin-top: 3px">Zebra Programming Language (ZPL) to Scalable Vector Graphics (SVG) converter written in vanilla JS.</h3>
-            <h3>The only dependencies for this project are <a href="https://github.com/metafloor/bwip-js">bwip-js</a> for barcode rendering and <a href="https://www.npmjs.com/package/canvas">canvas</a> for drawing graphic fields (only needed for Node.JS)</h3>
+            <h3>The only dependencies for this project are <a href="https://github.com/metafloor/bwip-js">bwip-js</a> for barcode rendering, <a href="https://github.com/nodeca/pako">pako</a> for Z64 graphics and <a href="https://www.npmjs.com/package/canvas">canvas</a> for drawing graphic fields (only needed for Node.JS)</h3>
             <p>ZPL example code represents the VDA 4902 standard label format for testing.</p>
             <p id="touch_value"></p>
         </div>

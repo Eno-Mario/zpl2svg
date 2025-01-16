@@ -7,6 +7,7 @@
         let bwipjs
         let canvas
         let imageLoader
+        let pako
         const getBwipJs = () => {
             if (bwipjs) return bwipjs
             try {
@@ -29,16 +30,26 @@
             }
             return canvas
         }
+        const getPako = () => {
+            if (pako) return pako
+            try {
+                pako = require('pako')
+            } catch (e) {
+                console.error('zpl2svg error: pako is required for Z64 graphic encoding and decoding')
+                throw e
+            }
+        }
         const getImageLoader = () => {
             if (imageLoader) return imageLoader
             getCanvas()
             return imageLoader
         }
-        module.exports = factory(getBwipJs, getCanvas, getImageLoader);
+        module.exports = factory(getBwipJs, getCanvas, getImageLoader, getPako);
     } else {
         const canvas = document.createElement('canvas') // @ts-ignore
         const getBwipJs = () => bwipjs
-        const getCanvas = () => canvas
+        const getCanvas = () => canvas // @ts-ignore
+        const getPako = () => pako
         const imageLoader = src => new Promise((resolve, reject) => {
             const img = new Image()
             img.onload = () => {
@@ -49,13 +60,13 @@
             img.src = src
         })
         const getImageLoader = () => imageLoader
-        const methods = factory(getBwipJs, getCanvas, getImageLoader);
+        const methods = factory(getBwipJs, getCanvas, getImageLoader, getPako);
         const keys = Object.keys(methods)
         for (let i = 0; i < keys.length; i++) {
             root[keys[i]] = methods[keys[i]] // Inject methods into global scope
         }
     }
-}(typeof self !== 'undefined' ? self : this, function (getBwipjs, getCanvas, getImageLoader) {
+}(typeof self !== 'undefined' ? self : this, function (getBwipjs, getCanvas, getImageLoader, getPako) {
 
     /** @type { (input: string[], configuration: { family: string, size: number, style: string, weight: string }) => void } */
     const parseFont = (input, configuration) => {
@@ -188,7 +199,7 @@
             }
         }
         const base64 = generateImageBase64({ bitmap, width, height, inverted })
-        const data = `<image x="0" y="0" width="${width}" height="${height}" xlink:href="${base64}" ${inverted ? 'class="zpl-inverted"' : ''} />`
+        const data = `<image x="0" y="0" width="${width}" height="${height}" size="${bitmap.length}" xlink:href="${base64}" ${inverted ? 'class="zpl-inverted"' : ''} />`
         image_cache.push({
             id: img_id,
             parameters,
@@ -205,10 +216,102 @@
     /** @type { (value: number, min: number, max: number) => number } */
     const constrain = (value, min, max) => Math.min(Math.max(value, min), max)
 
+    /** @type { (z64: string, width: number, height: number) => (1|0)[] } */
+    const z64_to_bitmap = (z64, width, height) => {
+        if (!z64.startsWith(':Z64:')) throw new Error('Invalid Z64 format');
+
+        // Extract Base64-encoded compressed data
+        const last_colon = z64.lastIndexOf(':');
+        const base64Data = z64.substring(5, last_colon);
+
+        // Base64 decode
+        const compressedData = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+
+        const pako = getPako();
+
+        // Decompress using zlib or pako
+        let decompressedData;
+        if (typeof pako !== 'undefined' && pako) {
+            decompressedData = pako.inflate(compressedData);
+        } else {
+            throw new Error('pako library is required');
+        }
+
+        // Calculate row length (bytes per row)
+        const rowlen = Math.ceil(width / 8);
+
+        // Validate decompressed data length
+        const expectedLength = rowlen * height;
+        if (decompressedData.length !== expectedLength) {
+            throw new Error(`Decompressed data length ${decompressedData.length} does not match expected ${expectedLength}`);
+        }
+
+        // Create the bitmap
+        const bitmap = new Array(width * height).fill(0);
+
+        // Map decompressed data to bitmap
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const byteIndex = y * rowlen + Math.floor(x / 8);
+                if (byteIndex >= decompressedData.length) {
+                    console.error(`Byte index out of bounds: ${byteIndex}`);
+                    continue;
+                }
+                const byte = decompressedData[byteIndex];
+                const bit = (byte >> (7 - (x % 8))) & 1;
+                bitmap[y * width + x] = bit ? 1 : 0;
+            }
+        }
+
+        return bitmap;
+    };
+
+    /** @type { (rle: string, width: number, height: number) => (1|0)[] } */
+    const rle_to_bitmap = (rle, width, height) => {
+        // Decompress the ZPL ASCII bitmap data
+        const decompressedDataHalfBytes = decodeRLE(rle);
+        let idx = 0
+        const bitmap = new Array(width * height).fill(0)
+
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const bitIndex = 3 - (x % 4)
+                if (!(x === 0 && y === 0) && x % 4 === 0) idx++
+                const byte = decompressedDataHalfBytes[idx]
+                if (typeof byte === 'undefined') break
+                if (byte === ',') break
+                if (byte === '!') {
+                    for (let i = x; i < width; i++) {
+                        bitmap[y * width + i] = 1
+                    }
+                    break
+                }
+                if (byte === ':') {
+                    if (y === 0) {
+                        for (let i = 0; i < width; i++) {
+                            bitmap[y * width + i] = 0
+                        }
+                    } else {
+                        for (let i = 0; i < width; i++) {
+                            bitmap[y * width + i] = bitmap[(y - 1) * width + i]
+                        }
+                    }
+                    break
+                }
+                if (typeof byte === 'number') {
+                    const bit = (byte >> bitIndex) & 1
+                    bitmap[y * width + x] = bit ? 1 : 0
+                }
+            }
+        }
+        return bitmap
+    }
+
+
     /** @type { (zpl: string, options?: { width?: number, height?: number, scale?: number, x_offset?: number, y_offset?: number, custom_class?: string, debug?: boolean, dynamic_size?: boolean }) => string } */
     const zpl2svg = (zpl, options) => {
         options = options || {}
-        const lines = zpl.split("\n").map(line => line.split('//')[0].trim()).filter(line => line.length > 0).join('').split('^').map(line => line.trim()).filter(line => line.length > 0)
+        const lines = zpl.split("\n").map(line => line.trim()).filter(line => line.length > 0).join('').split('^').map(line => line.trim()).filter(line => line.length > 0)
         const svg = []
         const scale = options.scale || 1
         const x_offset = options.x_offset || 0
@@ -886,56 +989,21 @@
                     const args = line.split(',')
                     const [compression, binary_byte_count, graphic_field_count, bytesPerRow, ...data] = args
                     const graphic = data.join(',')
-
+                    /** @type { (1|0)[] } */
+                    let pixelData = []
                     if (compression === 'A') {
-                        // Check if Z64 compression is used
-                        const z64 = graphic.includes('Z')
-                        if (z64) {
-                            console.log(`Z64 graphic field detected but not yet supported - ask the developer about this feature or implement it yourself and share it with the community :D`)
-                            break
-                        }
 
-                        // Decompress the ZPL ASCII bitmap data
-                        const decompressedDataHalfBytes = decodeRLE(graphic);
-                        let idx = 0
-                        if (debug) console.log(`Graphic Field ${[compression, binary_byte_count, graphic_field_count, bytesPerRow].join(',')}: ${graphic_field_count} with ${decompressedDataHalfBytes.length} half bytes decompressed`)
                         const width = parseInt(bytesPerRow) * 8
                         const height = (parseInt(graphic_field_count) / (parseInt(bytesPerRow) || 1)) || Infinity
 
-                        const pixelData = new Array(width * height).fill(0)
-                        for (let y = 0; y < height; y++) {
-                            for (let x = 0; x < width; x++) {
-                                const bitIndex = 3 - (x % 4)
-                                if (!(x === 0 && y === 0) && x % 4 === 0) idx++
-                                const byte = decompressedDataHalfBytes[idx]
-                                if (typeof byte === 'undefined') break
-                                if (byte === ',') break
-                                if (byte === '!') {
-                                    for (let i = x; i < width; i++) {
-                                        pixelData[y * width + i] = 1
-                                    }
-                                    break
-                                }
-                                if (byte === ':') {
-                                    if (y === 0) {
-                                        for (let i = 0; i < width; i++) {
-                                            pixelData[y * width + i] = 0
-                                        }
-                                    } else {
-                                        for (let i = 0; i < width; i++) {
-                                            pixelData[y * width + i] = pixelData[(y - 1) * width + i]
-                                        }
-                                    }
-                                    break
-                                }
-                                if (typeof byte === 'number') {
-                                    const bit = (byte >> bitIndex) & 1
-                                    pixelData[y * width + x] = bit
-                                }
-                            }
+                        // Check if Z64 compression is used
+                        const z64 = graphic.includes('Z')
+                        if (z64) {
+                            pixelData = z64_to_bitmap(graphic, width, height)
+                        } else {
+                            pixelData = rle_to_bitmap(graphic, width, height)
                         }
                         if (debug) {
-                            console.log(`decompressedDataHalfBytes:`, decompressedDataHalfBytes.map(c => typeof c === 'number' ? c.toString(16).toUpperCase() : c))
                             console.log(`width: ${width}, height: ${height}`)
                             console.log(`pixelData:`, pixelData)
                         }
