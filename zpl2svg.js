@@ -169,6 +169,8 @@
     /** @type { (options: { bitmap: (0 | 1)[], width: number, height: number, inverted?: boolean }) => string } */
     const generateImageBase64 = ({ bitmap, width, height, inverted }) => {
         const canvas = getCanvas()
+        canvas.width = width;
+        canvas.height = height;
         const ctx = canvas.getContext('2d');
         if (!ctx) throw new Error('Failed to get 2d context')
         const imageData = ctx.createImageData(width, height);
@@ -229,13 +231,10 @@
 
         const pako = getPako();
 
+        if (typeof pako === 'undefined' || !pako) throw new Error('pako library is required');
+
         // Decompress using zlib or pako
-        let decompressedData;
-        if (typeof pako !== 'undefined' && pako) {
-            decompressedData = pako.inflate(compressedData);
-        } else {
-            throw new Error('pako library is required');
-        }
+        const decompressedData = pako.inflate(compressedData); // uint8_t array, each byte represents 8 pixels
 
         // Calculate row length (bytes per row)
         const rowlen = Math.ceil(width / 8);
