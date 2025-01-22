@@ -17,6 +17,13 @@ body > div {
     padding-top: 0px;
 }
 
+h3 {
+    font-weight: normal;
+    font-size: 18px;
+    margin-top: 5px;
+    margin-bottom: 5px;
+}
+
 a { color: #0C3; }
 a:hover { color: #0F5; }
 
@@ -133,6 +140,7 @@ div.footer > div {
 
 #commits-table {
     width: 100%;
+    max-height: 180px;
     border-collapse: collapse;
     margin-top: 10px;
 }
@@ -170,7 +178,7 @@ div.footer > div {
     width: 130px;
 }
 /* add invisible horizontal scrollbar to overflowing text*/
-     td:nth-child(4) {
+#commits-table td:nth-child(4) {
     overflow: auto;
     white-space: nowrap;
     max-width: 300px;
