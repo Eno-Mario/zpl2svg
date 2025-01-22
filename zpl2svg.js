@@ -473,8 +473,8 @@
                 // Graphic Box
                 case 'GB': { // Format:  ^GBw,h,t,c,r   Example: '^GB200,200,10,B,1^FS'
                     const args = line.split(',')
-                    const width = parseInt(args[0])
-                    const height = parseInt(args[1])
+                    const width = parseInt(args[0]) || 1
+                    const height = parseInt(args[1]) || 1
                     const min = Math.min(width, height)
                     const inset = parseInt(args[2]) || 1
                     const color = ['B', 'W'].includes(args[3]) ? args[3] === 'B' ? '#000' : '#FFF' : null // B: Black, W: White
