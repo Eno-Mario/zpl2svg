@@ -29,22 +29,26 @@
         <link rel="stylesheet" href="./src/style.css">
     </head>
 
-    <body style="margin:15px">
+    <body>
+        <div class="header">
         <div>
             <h1>Realtime ZPL to SVG Converter</h1>
-            <p>Source code: <a href="https://github.com/Jozo132/zpl2svg">https://github.com/Jozo132/zpl2svg</a> - Author: Jozo132</p>
             <h3 style="margin-top: 3px">Zebra Programming Language (ZPL) to Scalable Vector Graphics (SVG) converter written in vanilla JS.</h3>
             <h3>The only dependencies for this project are <a href="https://github.com/metafloor/bwip-js">bwip-js</a> for barcode rendering, <a href="https://github.com/nodeca/pako">pako</a> for Z64 graphics and <a href="https://www.npmjs.com/package/canvas">canvas</a> for drawing graphic fields (only needed for Node.JS)</h3>
-            <p>ZPL example code represents the VDA 4902 standard label format for testing.</p>
             <p id="touch_value"></p>
-        </div>
-        <div class="output">
-            <div style="width: 100% !important; height: 70vh !important;">
-                <h2 style="margin-top: 16px; margin-bottom: 8px;">ZPL Input:</h2>
-                <div id="code_text"></div>
             </div>
-            <div class="tabs" style="width: 100% !important; height: 70vh !important;">
-                <div class="header">
+            <div>
+                <div id="commits-container"></div>
+            </div>
+        </div>
+
+        <div class="navigation">
+            <div style="width: 100% !important;">
+                <h2 style="margin-top: 3px; margin-bottom: 3px;">ZPL Input:</h2>
+                <p style="margin-bottom: 8px; font-size: 12px;">ZPL example code represents the VDA 4902 standard label format for testing.</p>
+            </div>
+            <div class="tabs" style="width: 100% !important;">
+                <div class="">
                     <button id="svg-tab" class="active" style="margin-left: 5px; border-radius: 5px 0px 0px 5px;">SVG</button>
                     <button id="raw-tab" style="border-radius: 0px 5px 5px 0px;">RAW</button>
                     <span style="margin-left: 10px; margin-right:25px">Render time:<span id="conversion_time" style="margin-left: 10px;">/</span></span>
@@ -52,18 +56,31 @@
                     <button id="download-svg" class="hidden">Download SVG</button>
                     <button id="download-png" class="hidden">Download PNG</button>
                 </div>
+            </div>
+        </div>
+        <div class="output" style="margin-bottom: 30px;">
+            <div>
+                <div id="code_text"></div>
+            </div>
+            <div>
                 <div id="svg-div" class="content">
-                    <div id="svg" style="width: 100%; height: 90%;"></div>
+                    <div id="svg"></div>
                 </div>
                 <div id="raw-div" class="content hidden">
                     <div id="svg_text"></div>
                 </div>
-                <div>
-                    <span>Zoom: <span id="zoom_value"></span></span>
-                    <br>
-                    <span>X: <span id="x_value"></span> Y: <span id="y_value"></span></span>
+            </div>
+        </div>
+        <div class="footer">
+            <div style="width: 100% !important;">
+                <div style="float: left;">
+                    <h4>GPL-3.0 license | source code: <a href="https://github.com/Jozo132/zpl2svg">https://github.com/Jozo132/zpl2svg</a></h4>
+                </div>
+                <div style="float: right; padding-right: 30px;">
+                    <span>Zoom: <span id="zoom_value">1.0</span></span> <span>X: <span id="x_value">0</span> Y: <span id="y_value">0</span></span>
                 </div>
             </div>
+
         </div>
     </body>
 

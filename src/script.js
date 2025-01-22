@@ -428,18 +428,28 @@ const update_sizes = () => {
         width: (svg_text_element.parentElement?.clientWidth || 0) - 10,
         height: (svg_text_element.parentElement?.clientHeight || 0) - 10
     }
-    const body_width = document.body.clientWidth
-    // zpl_editor.layout(zpl_params)
-    // svg_editor.layout(svg_params)
+    const body_width = innerWidth
+
     zpl_editor.layout(zpl_params)
     svg_editor.layout(svg_params)
 
     // show minimap only when body_width >= 1600
-    zpl_editor.updateOptions({ minimap: { enabled: body_width >= 1600 } })
-    svg_editor.updateOptions({ minimap: { enabled: body_width >= 1600 } })
+    zpl_editor.updateOptions({ minimap: { enabled: body_width >= 600 } })
+    svg_editor.updateOptions({ minimap: { enabled: body_width >= 600 } })
 
+    // Fix state width to resize to the document width
+    if (state.element) {
+        const { width, height } = state.element.getBoundingClientRect()
+        // Calculate the expected width based on the given style definition current html body width
+        const new_width = innerWidth >= 1600 ? body_width * (2 / 3) - 40 : body_width - 50
+        const h = state.element.parentElement?.parentElement?.clientHeight
+        const new_height = h ? h - 10 : height
+        // @ts-ignore
+        state.element.style.width = new_width + "px"
+        // @ts-ignore
+        state.element.style.height = new_height + "px"
+    }
 }
-update_sizes()
 
 let timeout = null
 let refresh_count = 0
@@ -489,6 +499,7 @@ window.addEventListener("resize", () => {
 
 button_svg.addEventListener("click", (e) => {
     e?.preventDefault()
+    setTimeout(() => update_sizes(), 50)
     div_svg.classList.remove("hidden")
     div_raw.classList.add("hidden")
     button_svg.classList.add("active")
@@ -565,4 +576,91 @@ async function export_png(filename, svg) {
 
 }
 
+setTimeout(() => update_sizes(), 500)
+
 download_png.addEventListener("click", () => export_png("label.png", state.svg_content))
+
+const getLastCommits = async () => {
+
+    const table_element = document.getElementById("commits-container")
+    if (!table_element) return console.error("Missing commits table element");
+    try {
+
+        // Use cached commits so we don't hit the github API rate limit
+        const stored_commits_json = localStorage.getItem("commit_cache") || ''
+        /** @type {{ updated: number, commits: any[] } | null} */
+        let stored_commits = null
+        if (stored_commits_json) {
+            try {
+                stored_commits = JSON.parse(stored_commits_json)
+            } catch (error) {
+                console.error("Failed to parse stored commits", error)
+                localStorage.removeItem("commit_cache")
+            }
+        }
+
+        let load_new_commits = true
+        let commits = []
+        if (stored_commits) {
+            const { updated } = stored_commits
+            const now = +new Date()
+            const diff = now - updated
+            const minutes = diff / 1000 / 60
+            if (minutes < 1) {
+                load_new_commits = false
+                commits = stored_commits.commits
+                console.log("Using cached commits")
+            }
+        }
+
+        if (load_new_commits) {
+            console.log("Loading new commits")
+            const res = await fetch('https://api.github.com/repos/jozo132/zpl2svg/commits?per_page=5')
+            const text = await res.text()
+            commits = JSON.parse(text)
+            stored_commits = { updated: +new Date(), commits }
+        }
+        try {
+            if (!Array.isArray(commits)) throw new Error("Invalid response")
+            if (load_new_commits) localStorage.setItem("commit_cache", JSON.stringify(stored_commits)) // Store commits in cache
+            const data = commits.map(({ commit: { committer: { date }, message }, author: { login, avatar_url, html_url: url_author }, sha, html_url: url_commit }) => ({
+                date, sha, login, avatar_url, message, url_author, url_commit
+            })).map(({ date, sha, login, avatar_url, message, url_author, url_commit }) => [
+                date.replace('T', ' ').replace('Z', ''),
+                `<a href="${url_commit}" target="_blank">${sha.substring(0, 7)}...</a>`,
+                `<a href="${url_author}" target="_blank" style="text-align: center; display: flex; align-items: center; justify-content: left;">` +
+                `<img src="${avatar_url}" alt="${login}" width="20" height="20" style="border-radius: 30%; margin-right: 5px;">${login}` +
+                `</a>`,
+                message
+            ])
+            data.forEach(commit => {
+                const date = commit[0]
+                const index_of_last_semicolon = date.lastIndexOf(':')
+                if (index_of_last_semicolon != -1) commit[0] = date.substring(0, index_of_last_semicolon)
+            })
+            table_element.innerHTML = `
+                <table id="commits-table">
+                    <tr>
+                        <th>Date</th>
+                        <th>Commit</th>
+                        <th>User</th>
+                        <th>Message</th>
+                    </tr>
+                    ${data.map(([date, commit, user, message]) => `<tr><td>${date}</td><td>${commit}</td><td><span>${user}</span></td><td>${message}</td></tr>`).join("")}
+                </table>`
+        } catch (error) {
+            if (commits && commits.message) {
+                table_element.innerHTML = `<p style="color: red;">Failed to load commits</p><p>${commits.message}</p>`
+            } else {
+                table_element.innerHTML = `<p style="color: red;">Failed to load commits</p><p>${error && error.message || error}</p>`
+            }
+        }
+
+    } catch (error) {
+        console.error(error)
+        table_element.innerHTML = `<p style="color: red;">Failed to load commits</p><p>${error && error.message || error}</p>`
+
+    }
+}
+
+getLastCommits()

@@ -11,33 +11,50 @@ body {
     font-family: 'Helvetica Neue', sans-serif;
 }
 
+/** add padding to the first body div */
+body > div {
+    padding: 10px;
+    padding-top: 0px;
+}
+
 a { color: #0C3; }
 a:hover { color: #0F5; }
+
+div.navigation {
+    display: grid;
+    grid-template-columns: 1fr 2fr; /* Desktop and larger screens*/
+    width: 100%;
+    padding-right: 20px;
+    /* handle mobile devices */
+    @media (max-width: 1600px) {
+        grid-template-columns: 1fr !important; /* Mobile and smaller screens */
+    }    
+}
 
 div.output {
     display: grid;
     grid-template-columns: 1fr 2fr; /* Desktop and larger screens*/
     width: 100%;
-    height: 80vh !important;
-    padding-top: 10px;
-    margin-bottom: 15px;
-}
-
-/* handle mobile devices */
-@media (max-width: 1000px) {
-    div.output {
+    /* handle mobile devices */
+    @media (max-width: 1600px) {
         grid-template-columns: 1fr !important; /* Mobile and smaller screens */
-        height: 50vh !important;
+    }    
+}
+div.output > div {
+    height: 70vh;
+    @media (max-width: 1600px) {
+        height: 40vh !important;
     }
 }
 
+
+
 .content {
-    padding: 5px;
     margin: 0px;
     height: 100%;
 }
 
-div.output h2 {
+div.navigation h2 {
     font-size: 16px;
     margin-top: 10px;
     margin-bottom: 3px;
@@ -48,7 +65,7 @@ div.output h2 {
 }
 
 
-div.output button {
+div.navigation button {
     background-color: #CCC;
     color: #333;
     border: none;
@@ -61,18 +78,148 @@ div.output button {
     margin-bottom: 5px;
 }
 
-div.output button.active {
+div.navigation button.active {
     background-color: #091;
     color: #fff;
 }
 
-div.output button:hover {
+div.navigation button:hover {
     background-color: #666;
 }
 
-div.output button.active:hover {
+div.navigation button.active:hover {
     background-color: #061;
 }
+
+div.header {
+    display: grid;
+    grid-template-columns: 2fr 3fr;
+    padding-right: 20px;
+
+    /* handle mobile devices */
+    @media (max-width: 1600px) {
+        grid-template-columns: 1fr !important; /* Mobile and smaller screens */
+    }
+}
+
+
+/** position the footer to the bottom of the page */
+div.footer {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    text-align: center;
+    padding: 5px;
+    background-color: #333;
+    border-top: 1px solid #666;
+}
+
+div.footer > div {
+    display: inline-block;
+    margin: 0 10px;
+}
+
+
+
+/*
+<table id="commits-table">
+    <tr>
+        <th>Date</th>
+        <th>User</th>
+        <th>Commit</th>
+    </tr>
+</table>
+*/
+
+#commits-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+#commits-table th {
+    background-color: #444F;
+    color: #fff;
+    padding: 5px;
+    text-align: left;
+}
+#commits-table td {
+    padding: 5px;
+    border-bottom: 1px solid #666;
+}
+#commits-table tr:nth-child(odd) {
+    background-color: #4444;
+}
+#commits-table tr:nth-child(even) {
+    background-color: #4448;
+}
+#commits-table tr:hover {
+    background-color: #666;
+}
+
+/* fit timestamp cell width to 170px */
+#commits-table td:nth-child(1) {
+    width: 140px !important;
+    min-width: 140px !important;
+}
+/* fit user max-width to 180px */
+#commits-table td:nth-child(2) {
+    width: 90px;
+}
+/* fit user max-width to 180px */
+#commits-table td:nth-child(3) {
+    width: 130px;
+}
+/* add invisible horizontal scrollbar to overflowing text*/
+     td:nth-child(4) {
+    overflow: auto;
+    white-space: nowrap;
+    max-width: 300px;
+    min-width: 300px;
+}
+
+
+/** style all scrollbars as invisible and show only the scrollbar thumb when hovered */
+
+::-webkit-scrollbar {
+    width: 0px;
+    height: 0px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #666;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #444;
+}
+
+::-webkit-scrollbar-track {
+    background: #333;
+}
+
+::-webkit-scrollbar-corner {
+    background: #333;
+}
+
+::-webkit-scrollbar-button {
+    display: none;
+}
+
+::-webkit-scrollbar-track-piece {
+    display: none;
+}
+
+::-webkit-scrollbar-corner {
+    display: none;
+}
+
+::-webkit-resizer {
+    display: none;
+}
+
+
+
 
 
 /* div.output pre {
