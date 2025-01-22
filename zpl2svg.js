@@ -476,7 +476,7 @@
                     const width = parseInt(args[0])
                     const height = parseInt(args[1])
                     const min = Math.min(width, height)
-                    const inset = parseInt(args[2]) || 0
+                    const inset = parseInt(args[2]) || 1
                     const color = ['B', 'W'].includes(args[3]) ? args[3] === 'B' ? '#000' : '#FFF' : null // B: Black, W: White
                     const radius = min > 0 ? constrain(parseInt(args[4]) || 0, 0, 8) / 16 * min : 0 // From 0 to 8 where the value is multiplied by 1/8 and multiplied by the shortest side of the box
                     // Draw shape with inset except when inset > width/2 or height/2 then just draw a rectangle with fill
