@@ -557,6 +557,35 @@
                     break
                 }
 
+                case 'GD': { // Graphic Diagonal Line
+                    const args = line.split(',')
+                    // the top left corner of the box representing the inner diagonal line is defined by ^FO
+                    const width = constrain(parseInt(args[0]) || 3, 3, 32_000)
+                    const height = constrain(parseInt(args[1]) || 3, 3, 32_000)
+                    const thickness = constrain(parseInt(args[2]) || 1, 1, 32_000) // in dots, extends towards the right
+                    const color = args[3] === 'W' ? '#FFF' : '#000'
+                    const orientation = args[4] === 'L' ? 'left' : 'right' // Left: from top left to bottom right, Right: from top right to bottom left
+                    const T0 = {
+                        x: state.position.x + state.label_home_x,
+                        y: state.position.y + state.label_home_y
+                    }
+                    const T1 = {
+                        x: T0.x + width,
+                        y: T0.y + height
+                    }
+                    const x0 = T0.x
+                    const y0 = orientation === 'left' ? T0.y : T1.y
+                    const x1 = T1.x
+                    const y1 = orientation === 'left' ? T1.y : T0.y
+                    const x2 = x1 + thickness
+                    const y2 = y1
+                    const x3 = x0 + thickness
+                    const y3 = y0
+                    svg.push(`    <path type="diagonal-${orientation}" d="M${x0} ${y0} L${x1} ${y1} L${x2} ${y2} L${x3} ${y3} Z" fill="${color}" ${inverted_body}/>`)
+                    state.inverted = false
+                    break
+                }
+
                 case 'FR': // Field Reverse Print
                     state.inverted = true;
                     break
