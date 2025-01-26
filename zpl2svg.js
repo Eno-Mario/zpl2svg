@@ -557,7 +557,58 @@
                     break
                 }
 
-                case 'GD': { // Graphic Diagonal Line
+                // Graphic Circle
+                case 'GC': { // Format: ^GCd,t,c  Example: '^GC100,5,B^FS'
+                    const args = line.split(',')
+                    const diameter = constrain(parseInt(args[0]) || 3, 3, 4095)
+                    const inset = constrain(parseInt(args[1]) || 1, 1, 4095)
+                    const color = ['B', 'W'].includes(args[2]) ? args[2] === 'W' ? '#FFF' : '#000' : null // B: Black, W: White
+                    // Draw the shape by drawing a circle with a smaller circle inside
+                    // The position of the top left corner of the circle is defined by ^FO
+                    const x = state.position.x + state.label_home_x
+                    const y = state.position.y + state.label_home_y
+                    const fill = color || state.fill
+                    const stroke = color || state.stroke
+                    const r = diameter / 2
+                    const i = inset
+                    const full = r <= i
+                    let circle
+                    if (full) {
+                        circle = `    <circle type="circle" cx="${x + r}" cy="${y + r}" r="${r}" fill="${fill}" ${inverted_body}/>`
+                    } else {
+                        const xi = x + i
+                        const yi = y + i
+                        const ri = r - i
+                        if (ri <= 0) {
+                            circle = `    <circle type="circle" cx="${x + r}" cy="${y + r}" r="${r}" fill="none" stroke="${stroke}" stroke-width="${i}" ${inverted_body}/>`
+                        } else {
+                            const path = [
+                                // Outer circle path:
+                                `M ${x + r} ${y}`,
+                                `a ${r} ${r} 0 0 1 ${r} ${r}`,
+                                `a ${r} ${r} 0 0 1 -${r} ${r}`,
+                                `a ${r} ${r} 0 0 1 -${r} -${r}`,
+                                `a ${r} ${r} 0 0 1 ${r} -${r}`,
+                                `z`,
+                                // Inner circle path:
+                                `M ${xi + ri} ${yi}`,
+                                `a ${ri} ${ri} 0 0 1 ${ri} ${ri}`,
+                                `a ${ri} ${ri} 0 0 1 -${ri} ${ri}`,
+                                `a ${ri} ${ri} 0 0 1 -${ri} -${ri}`,
+                                `a ${ri} ${ri} 0 0 1 ${ri} -${ri}`,
+                                `z`
+
+                            ]
+                            circle = `    <path type="circle" d="${path.join(' ')}" fill="${stroke}" stroke="none" fill-rule="evenodd" ${inverted_body}/>`
+                        }
+                    }
+                    svg.push(circle)
+                    state.inverted = false
+                    break
+                }
+
+                // Graphic Diagonal Line
+                case 'GD': { // Format: ^GDw,h,t,c,o  Example: '^GD200,200,10,B,L^FS'
                     const args = line.split(',')
                     // the top left corner of the box representing the inner diagonal line is defined by ^FO
                     const width = constrain(parseInt(args[0]) || 3, 3, 32_000)
@@ -582,6 +633,52 @@
                     const x3 = x0 + thickness
                     const y3 = y0
                     svg.push(`    <path type="diagonal-${orientation}" d="M${x0} ${y0} L${x1} ${y1} L${x2} ${y2} L${x3} ${y3} Z" fill="${color}" ${inverted_body}/>`)
+                    state.inverted = false
+                    break
+                }
+
+                // Graphic Ellipse
+                case 'GE': { // Format: ^GEw,h,t,c  Example: '^GE200,200,10,B^FS'
+                    const args = line.split(',')
+                    const width = constrain(parseInt(args[0]) || 3, 3, 32_000)
+                    const height = constrain(parseInt(args[1]) || 3, 3, 32_000)
+                    const thickness = constrain(parseInt(args[2]) || 1, 1, 32_000) // in dots
+                    const color = args[3] === 'W' ? '#FFF' : '#000'
+                    const T0 = {
+                        x: state.position.x + state.label_home_x,
+                        y: state.position.y + state.label_home_y
+                    }
+                    const x = T0.x
+                    const y = T0.y
+                    const rx = width / 2
+                    const ry = height / 2
+                    const inset = thickness
+                    const shortest = Math.min(width, height)
+                    const full = shortest / 2 <= inset
+                    const path = [
+                        `M ${x + rx} ${y}`,
+                        `a ${rx} ${ry} 0 0 1 ${rx} ${ry}`,
+                        `a ${rx} ${ry} 0 0 1 -${rx} ${ry}`,
+                        `a ${rx} ${ry} 0 0 1 -${rx} -${ry}`,
+                        `a ${rx} ${ry} 0 0 1 ${rx} -${ry}`,
+                        `z`
+                    ]
+                    if (!full) {
+                        const xi = x + inset
+                        const yi = y + inset
+                        const rxi = rx - inset
+                        const ryi = ry - inset
+                        const path2 = [
+                            `M ${xi + rxi} ${yi}`,
+                            `a ${rxi} ${ryi} 0 0 1 ${rxi} ${ryi}`,
+                            `a ${rxi} ${ryi} 0 0 1 -${rxi} ${ryi}`,
+                            `a ${rxi} ${ryi} 0 0 1 -${rxi} -${ryi}`,
+                            `a ${rxi} ${ryi} 0 0 1 ${rxi} -${ryi}`,
+                            `z`
+                        ]
+                        path.push(...path2)
+                    }
+                    svg.push(`    <path type="ellipse" d="${path.join(' ')}" fill="${color}" stroke="none" fill-rule="evenodd" ${inverted_body}/>`)
                     state.inverted = false
                     break
                 }
