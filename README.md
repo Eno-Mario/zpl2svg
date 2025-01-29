@@ -3,7 +3,7 @@
 
 #### You can try it out here: [ZPL to SVG Converter](https://jozo132.github.io/zpl2svg/)
 
-![image](https://github.com/user-attachments/assets/3af071e5-d418-4b82-97bf-37aaca37a468)
+![image](https://github.com/user-attachments/assets/33841a00-f7b7-4deb-ac3d-811db46edce3)
 
 The goal is to be able to convert from ZPL to SVG and possibly vice verse. 
 The conversion speed is decently fast with under 10ms from current testing. 
@@ -11,16 +11,18 @@ There are still a lot of bugs and missing features.
 
 #### Dependencies: 
 - [bwip-js](https://www.npmjs.com/package/bwip-js) for barcode rendering
+- [pako](https://github.com/nodeca/pako) for Z64 graphic encoding
 - [canvas](https://www.npmjs.com/package/canvas) for graphic fields (only for Node.JS)
 
 ## Practical usage
 #### Node.JS first install:
 ```sh
-npm i bwip-js canvas
+npm i bwip-js pako canvas
 ```
 #### Browser import:
 ```html
 <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/bwip-js/4.5.1/bwip-js-min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
 <script src="path_to/zpl2svg.js"></script>
 ```
 
@@ -54,6 +56,9 @@ const svg_content = zpl2svg(zpl_content, {
 - ^CF `Font selection`
 - ^FO/^F0 `Field origin`
 - ^GB `Graphic box`
+- ^GD `Graphic diagonal line`
+- ^GC `Graphic circle`
+- ^GE `Graphic ellipse`
 - ^FR `Field reverse point`
 - ^FD `Field data`
 - ^BY `Barcode field default parameters`
