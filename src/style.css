@@ -164,21 +164,26 @@ div.footer > div {
     background-color: #666;
 }
 
-/* fit timestamp cell width to 170px */
+/* fit commit number cell width to 50px */
 #commits-table td:nth-child(1) {
+    width: 50px !important;
+    min-width: 50px !important;
+}
+/* fit timestamp cell width to 170px */
+#commits-table td:nth-child(2) {
     width: 140px !important;
     min-width: 140px !important;
 }
 /* fit user max-width to 180px */
-#commits-table td:nth-child(2) {
+#commits-table td:nth-child(3) {
     width: 90px;
 }
 /* fit user max-width to 180px */
-#commits-table td:nth-child(3) {
+#commits-table td:nth-child(4) {
     width: 130px;
 }
 /* add invisible horizontal scrollbar to overflowing text*/
-#commits-table td:nth-child(4) {
+#commits-table td:nth-child(5) {
     overflow: auto;
     white-space: nowrap;
     max-width: 300px;

@@ -584,11 +584,38 @@ const getLastCommits = async () => {
 
     const table_element = document.getElementById("commits-container")
     if (!table_element) return console.error("Missing commits table element");
+
+    const getCommitCount = async (username, repo, branch) => {
+        const url = `https://api.github.com/repos/${username}/${repo}/commits?sha=${branch}&per_page=1&page=1`;
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            const linkHeader = response.headers.get('Link');
+            if (!linkHeader) {
+                return 1; // If no Link header, there's only one commit.
+            }
+            const match = linkHeader.match(/&page=(\d+)>; rel="last"/);
+            return match ? parseInt(match[1], 10) : 1;
+        } catch (error) {
+            console.error("Error fetching commit count:", error);
+            return 0;
+        }
+    }
+
+    const getCommits = async (username, repo, branch, limit = 5) => {
+        const res = await fetch(`https://api.github.com/repos/${username}/${repo}/commits?sha=${branch}&per_page=${limit}`)
+        const text = await res.text()
+        const commits = JSON.parse(text)
+        return commits
+    }
+
     try {
 
         // Use cached commits so we don't hit the github API rate limit
         const stored_commits_json = localStorage.getItem("commit_cache") || ''
-        /** @type {{ updated: number, commits: any[] } | null} */
+        /** @type {{ updated: number, commits: any[], total: number } | null} */
         let stored_commits = null
         if (stored_commits_json) {
             try {
@@ -606,7 +633,7 @@ const getLastCommits = async () => {
             const now = +new Date()
             const diff = now - updated
             const minutes = diff / 1000 / 60
-            if (minutes < 1) {
+            if (minutes < 2) {
                 load_new_commits = false
                 commits = stored_commits.commits
                 console.log("Using cached commits")
@@ -615,17 +642,18 @@ const getLastCommits = async () => {
 
         if (load_new_commits) {
             console.log("Loading new commits")
-            const res = await fetch('https://api.github.com/repos/jozo132/zpl2svg/commits?per_page=5')
-            const text = await res.text()
-            commits = JSON.parse(text)
-            stored_commits = { updated: +new Date(), commits }
+            commits = await getCommits('jozo132', 'zpl2svg', 'main', 5)
+            const total = await getCommitCount('jozo132', 'zpl2svg', 'main')
+            stored_commits = { updated: +new Date(), commits, total }
         }
         try {
             if (!Array.isArray(commits)) throw new Error("Invalid response")
             if (load_new_commits) localStorage.setItem("commit_cache", JSON.stringify(stored_commits)) // Store commits in cache
-            const data = commits.map(({ commit: { committer: { date }, message }, author: { login, avatar_url, html_url: url_author }, sha, html_url: url_commit }) => ({
-                date, sha, login, avatar_url, message, url_author, url_commit
-            })).map(({ date, sha, login, avatar_url, message, url_author, url_commit }) => [
+            const total = stored_commits?.total || 0
+            const data = commits.map(({ commit: { committer: { date }, message }, author: { login, avatar_url, html_url: url_author }, sha, html_url: url_commit }, i) => ({
+                index: total - i, date, sha, login, avatar_url, message, url_author, url_commit
+            })).map(({ index, date, sha, login, avatar_url, message, url_author, url_commit }) => [
+                index,
                 date.replace('T', ' ').replace('Z', ''),
                 `<a href="${url_commit}" target="_blank">${sha.substring(0, 7)}...</a>`,
                 `<a href="${url_author}" target="_blank" style="text-align: center; display: flex; align-items: center; justify-content: left;">` +
@@ -634,19 +662,20 @@ const getLastCommits = async () => {
                 message
             ])
             data.forEach(commit => {
-                const date = commit[0]
+                const date = commit[1]
                 const index_of_last_semicolon = date.lastIndexOf(':')
-                if (index_of_last_semicolon != -1) commit[0] = date.substring(0, index_of_last_semicolon)
+                if (index_of_last_semicolon != -1) commit[1] = date.substring(0, index_of_last_semicolon)
             })
             table_element.innerHTML = `
                 <table id="commits-table">
-                    <tr>
+                    <tr class="sticky">
+                        <th>#</th>
                         <th>Date</th>
                         <th>Commit</th>
                         <th>User</th>
                         <th>Message</th>
                     </tr>
-                    ${data.map(([date, commit, user, message]) => `<tr><td>${date}</td><td>${commit}</td><td><span>${user}</span></td><td>${message}</td></tr>`).join("")}
+                    ${data.map(([index, date, commit, user, message]) => `<tr><td>${index}</td><td>${date}</td><td>${commit}</td><td><span>${user}</span></td><td>${message}</td></tr>`).join("")}
                 </table>`
         } catch (error) {
             if (commits && commits.message) {
