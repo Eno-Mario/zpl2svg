@@ -43,7 +43,7 @@
             if (imageLoader) return imageLoader
             getCanvas()
             return imageLoader
-        }
+        } // @ts-ignore
         module.exports = factory(getBwipJs, getCanvas, getImageLoader, getPako);
     } else {
         const canvas = document.createElement('canvas') // @ts-ignore
@@ -895,11 +895,14 @@
                             const text = `    <text x="${x}" y="${y}" dy="0.75em" font-size="${size}" font-family="${family}" font-style="${style}" font-weight="${weight}" fill="${state.fill}" ${inverted_body}>${value}</text>`
                             svg.push(text)
                         } else {
-                            const text = value // Newlines are ignored in ZPL
+                            const includes_line_separator = value.includes('\\&')
+                            const text = value.replaceAll('\\&', '\n') // Newlines are ignored in ZPL, use \\& to indicate a newline
                             const centered = alignment === 'C'
                             const right = alignment === 'R'
                             const justified = alignment === 'J'
                             const left = alignment === 'L' || justified // TODO: Implement justified text
+
+                            if (centered && !includes_line_separator) console.warn('Centered ^FD text field without line separator "\\&"')
 
                             const x = state.position.x + state.label_home_x + (centered ? max_width / 2 : 0) + (right ? max_width : 0)
                             let y = state.position.y + state.label_home_y
@@ -910,6 +913,7 @@
                             const characters = text.split('')
                             // Calculate the width of each character that will be drawn to decide when to wrap the text
                             characters.forEach(c => {
+                                if (c === '\n') return
                                 const measured = typeof character_widths[c] !== 'undefined'
                                 if (measured) return
                                 const metrics = measureText(c, size, family, style, weight)
@@ -920,8 +924,14 @@
                             let line = ''
                             let line_width = 0
                             for (let i = 0; i < characters.length; i++) {
-                                const char = characters[i]
-                                const char_width = character_widths[char] || 0
+                                const c = characters[i]
+                                if (c === '\n') {
+                                    lines.push(line)
+                                    line = ''
+                                    line_width = 0
+                                    continue
+                                }
+                                const char_width = character_widths[c] || 0
                                 const new_line_width = line_width + char_width
                                 if (line && new_line_width > max_width) {
                                     lines.push(line)
@@ -931,7 +941,7 @@
                                 } else {
                                     line_width = new_line_width
                                 }
-                                line += char
+                                line += c
                             }
 
                             if (line) {
