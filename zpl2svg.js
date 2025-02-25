@@ -330,16 +330,27 @@
                 family: "",
                 size: 0,
                 style: "",
-                weight: ""
+                weight: "",
+                max_width: 0,
+                max_lines: 1,
+                line_spacing: 0,
+                alignment: "L",
+                hanging_indent: 0,
+                parse_hex: false
             },
             position: {
                 x: 0,
                 y: 0,
             },
+            // TODO: implement field alignment
+            field_orientation: 'N',
+            field_alignment: 0, // 0: left, 1: right, 2: auto
+
             label_home_x: 0,
             label_home_y: 0,
             label_width: 0,
             label_height: 0,
+            label_mirrored: false,
             stroke: "#000",
             fill: "#000",
             inverted: false,
@@ -357,10 +368,30 @@
                 print_above: false,
             }
         }
-
+        const resetNextFont = () => {
+            state.next_font.size = 0
+            state.next_font.family = ''
+            state.next_font.style = ''
+            state.next_font.weight = ''
+            state.next_font.max_width = 0
+            state.next_font.max_lines = 1
+            state.next_font.line_spacing = 0
+            state.next_font.alignment = 'L'
+            state.next_font.hanging_indent = 0
+            state.next_font.parse_hex = false
+        }
         const main_classes = [
             custom_class
         ].filter(Boolean).join(' ')
+
+        /** @type { (text: string, size: number, family: string, style: string, weight: string) => TextMetrics } */
+        const measureText = (text, size, family, style, weight) => {
+            const canvas = getCanvas()
+            const ctx = canvas.getContext('2d')
+            if (!ctx) throw new Error('Failed to get 2d context')
+            ctx.font = `${style} ${weight} ${size}px ${family}`
+            return ctx.measureText(text)
+        }
 
         // YYYY-MM-DD HH:MM:SS
         const timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '')
@@ -420,7 +451,36 @@
                     break
 
                 case 'PR': break // Print Rate
+                case 'MD': break // Media Darkness
+                case 'PO': {
+                    const args = line.split(',')
+                    state.label_mirrored = args[0] === 'I' // TODO: implement mirrored labels
+                    break
+                }
+                case 'CI': break // Character set, custom mapping TODO: Implement this
 
+                case 'FB': { // Text block for next field
+                    const args = line.split(',')
+                    state.next_font.max_width = parseInt(args[0]) || 0
+                    state.next_font.max_lines = parseInt(args[1]) || 1
+                    state.next_font.line_spacing = parseInt(args[2]) || 0
+                    state.next_font.alignment = args[3] || 'L'
+                    state.next_font.hanging_indent = parseInt(args[4]) || 0
+                    break
+                }
+
+                case 'FW': { // Field orientation and alignment
+                    // TODO: implement field orientation and alignment
+                    const args = line.split(',')
+                    state.field_orientation = args[0] || 'N'
+                    state.field_alignment = parseInt(args[1]) || 0
+                    break
+                }
+
+                case 'FH': { // Field Hexadecimal Indicator
+                    state.next_font.parse_hex = true
+                    break
+                }
 
                 case 'FX': svg.push(`    <!-- ${line} -->`); break // Comment
 
@@ -692,6 +752,34 @@
                     const args = line.split(',')
                     state.inverted = false
                     let value = args.join(',')
+
+                    const size = state.next_font.size || state.font.size
+                    const family = state.next_font.family || state.font.family
+                    const style = state.next_font.style || state.font.style
+                    const weight = state.next_font.weight || state.font.weight
+                    const max_width = state.next_font.max_width
+                    const max_lines = state.next_font.max_lines
+                    const line_spacing = state.next_font.line_spacing
+                    const alignment = state.next_font.alignment
+                    const hanging_indent = state.next_font.hanging_indent
+                    const parse_hex = state.next_font.parse_hex
+                    resetNextFont()
+
+                    if (parse_hex) {
+                        // Split text by underscore and take the next two characters and interpret them as 02x which represents the character code, if invalid just skip that character
+                        // After that put the string back together
+                        const characters = value.split('_')
+                        const parsed = characters.map((c, i) => {
+                            if (i === 0) return c
+                            const hex = c.substring(0, 2)
+                            c = c.substring(2)
+                            const code = parseInt(hex, 16)
+                            if (isNaN(code)) return c
+                            return String.fromCharCode(code) + c
+                        })
+                        value = parsed.join('')
+                    }
+
                     if (state.barcode.type) {
                         let bcid = ''
                         const scale = state.barcode.barscale
@@ -798,24 +886,92 @@
 
                             ].join('\n'))
                         }
-                        state.next_font.size = 0
-                        state.next_font.family = ''
-                        state.next_font.style = ''
-                        state.next_font.weight = ''
                         state.barcode.type = ''
                     } else {
-                        const size = state.next_font.size || state.font.size
-                        const family = state.next_font.family || state.font.family
-                        const style = state.next_font.style || state.font.style
-                        const weight = state.next_font.weight || state.font.weight
-                        state.next_font.size = 0
-                        state.next_font.family = ''
-                        state.next_font.style = ''
-                        state.next_font.weight = ''
-                        const x = state.position.x + state.label_home_x
-                        const y = state.position.y + state.label_home_y
-                        const text = `    <text x="${x}" y="${y}" dy="0.75em" font-size="${size}" font-family="${family}" font-style="${style}" font-weight="${weight}" fill="${state.fill}" ${inverted_body}>${value}</text>`
-                        svg.push(text)
+                        const text_block = max_width > 0 || alignment !== 'L' || hanging_indent > 0
+                        if (!text_block) {
+                            const x = state.position.x + state.label_home_x
+                            const y = state.position.y + state.label_home_y
+                            const text = `    <text x="${x}" y="${y}" dy="0.75em" font-size="${size}" font-family="${family}" font-style="${style}" font-weight="${weight}" fill="${state.fill}" ${inverted_body}>${value}</text>`
+                            svg.push(text)
+                        } else {
+                            const text = value // Newlines are ignored in ZPL
+                            const centered = alignment === 'C'
+                            const right = alignment === 'R'
+                            const justified = alignment === 'J'
+                            const left = alignment === 'L' || justified // TODO: Implement justified text
+
+                            const x = state.position.x + state.label_home_x + (centered ? max_width / 2 : 0) + (right ? max_width : 0)
+                            let y = state.position.y + state.label_home_y
+
+
+                            /** @type {{ [character: string]: number }} */
+                            const character_widths = {}
+                            const characters = text.split('')
+                            // Calculate the width of each character that will be drawn to decide when to wrap the text
+                            characters.forEach(c => {
+                                const measured = typeof character_widths[c] !== 'undefined'
+                                if (measured) return
+                                const metrics = measureText(c, size, family, style, weight)
+                                character_widths[c] = metrics.width
+                            })
+
+                            const lines = []
+                            let line = ''
+                            let line_width = 0
+                            for (let i = 0; i < characters.length; i++) {
+                                const char = characters[i]
+                                const char_width = character_widths[char] || 0
+                                const new_line_width = line_width + char_width
+                                if (line && new_line_width > max_width) {
+                                    lines.push(line)
+                                    line = ''
+                                    line_width = 0
+                                    line_width = char_width
+                                } else {
+                                    line_width = new_line_width
+                                }
+                                line += char
+                            }
+
+                            if (line) {
+                                lines.push(line)
+                            }
+
+                            if (centered) {
+                                for (let i = 0; i < lines.length; i++) {
+                                    const line = lines[i]
+                                    // Draw all lines on the same x and use style="text-anchor: middle;" to center the text
+                                    const text = `    <text x="${x}" y="${y}" dy="0.75em" font-size="${size}" font-family="${family}" font-style="${style}" font-weight="${weight}" fill="${state.fill}" ${inverted_body} style="text-anchor: middle;">${line}</text>`
+                                    svg.push(text)
+                                    if (i < max_lines - 1) y += size + line_spacing
+                                }
+                            } else if (right) {
+                                for (let i = 0; i < lines.length; i++) {
+                                    const line = lines[i]
+                                    // Draw all lines on the same x and use style="text-anchor: end;" to right-align the text
+                                    const text = `    <text x="${x}" y="${y}" dy="0.75em" font-size="${size}" font-family="${family}" font-style="${style}" font-weight="${weight}" fill="${state.fill}" ${inverted_body} style="text-anchor: end;">${line}</text>`
+                                    svg.push(text)
+                                    if (i < max_lines - 1) y += size + line_spacing
+                                }
+                            } else if (left) {
+                                for (let i = 0; i < lines.length; i++) {
+                                    const line = lines[i]
+                                    const text = `    <text x="${x}" y="${y}" dy="0.75em" font-size="${size}" font-family="${family}" font-style="${style}" font-weight="${weight}" fill="${state.fill}" ${inverted_body}>${line}</text>`
+                                    svg.push(text)
+                                    if (i < max_lines - 1) y += size + line_spacing
+                                }
+                            } else if (justified) {
+                                for (let i = 0; i < lines.length; i++) {
+                                    const line = lines[i]
+                                    const text = `    <text x="${x}" y="${y}" dy="0.75em" font-size="${size}" font-family="${family}" font-style="${style}" font-weight="${weight}" fill="${state.fill}" ${inverted_body}>${line}</text>`
+                                    svg.push(text)
+                                    if (i < max_lines - 1) y += size + line_spacing
+                                }
+                            } else {
+                                console.error(new Error(`Unsupported alignment: ${alignment}`))
+                            }
+                        }
                     }
                     state.inverted = false
                     break
