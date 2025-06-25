@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>QR Code Test</title>
+    <script
+      type="text/javascript"
+      src="https://cdnjs.cloudflare.com/ajax/libs/bwip-js/4.5.1/bwip-js-min.js"></script>
+    <script
+      type="text/javascript"
+      src="zpl2svg.js"></script>
+  </head>
+  <body>
+    <h1>QR Code Test</h1>
+    <div id="output"></div>
+
+    <script>
+      // Test QR code ZPL
+      const testZPL = `^XA
+^FO50,50^BQN,2,10,L,7^FD123456789^FS
+^FO50,200^BQN,2,5,M,0^FDhttps://example.com^FS
+^XZ`;
+
+      try {
+        const svg = zpl2svg(testZPL, { width: 800, height: 600 });
+        document.getElementById("output").innerHTML = svg;
+        console.log("QR Code generated successfully!");
+      } catch (error) {
+        console.error("Error generating QR code:", error);
+        document.getElementById("output").innerHTML =
+          '<p style="color: red;">Error: ' + error.message + "</p>";
+      }
+    </script>
+  </body>
+</html>
